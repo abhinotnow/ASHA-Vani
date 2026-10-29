@@ -22,8 +22,8 @@ The graph owns conversation decisions. Audio streaming, buffering, playback, and
 
 ## Agree with Person B
 
-- Graph input: session ID, utterance sequence, final transcript, and available language metadata.
-- Graph output: reply text plus the action/turn status the voice layer needs.
+- Person B's current graph processes structured `extracted_turn` data; it does not yet parse raw transcript text. Agree the final transcript-in/reply-out contract before voice integration.
+- Agree the final handoff: session ID, utterance sequence, final transcript/language metadata, and graph reply/action output.
 - Event names/payloads, error behavior, and who owns each API boundary.
 - Whether Prisma can signal a configured end-word such as “OVER,” or only transcribe it. Treat end-word handling as a proposal until verified.
 
