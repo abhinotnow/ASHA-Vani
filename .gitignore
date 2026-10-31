@@ -5,9 +5,15 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
 # Virtual environments
 .venv
 
-#Secrets!!!
+# Secrets
 .env
+
+# Local AI agent & Graphify tooling outputs
+.agents/
+.claude/
+graphify-out/

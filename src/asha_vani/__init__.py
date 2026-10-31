@@ -1,2 +1,7 @@
+"""ASHA-Vani package entrypoint (`uv run asha-vani`)."""
+
+
 def main() -> None:
-    print("Hello from asha-vani!")
+    import uvicorn
+
+    uvicorn.run("asha_vani.server:app", host="127.0.0.1", port=8000, reload=True)

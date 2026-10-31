@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASHA-Vani · PHC Register & Nokia Simulator Sketch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* =====================================================================
+       Design System: Cal.com + Vercel Light (Left 75%) & Linear Dark (Right 25%)
+       ===================================================================== */
+    :root {
+      --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      /* Light PHC Console tokens (Vercel / Cal.com) */
+      --bg-canvas: #fafafa;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f4f4f5;
+      --text-primary: #171717;
+      --text-secondary: #52525b;
+      --text-muted: #71717a;
+      --border-ring: rgba(0, 0, 0, 0.08);
+      --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.08), 0px 2px 4px rgba(0, 0, 0, 0.03);
+      --shadow-drawer: -8px 0px 30px rgba(0, 0, 0, 0.08), -1px 0px 0px rgba(0, 0, 0, 0.08);
+
+      /* Semantic Triage Tokens */
+      --crit-bg: #fef2f2;
+      --crit-text: #dc2626;
+      --crit-ring: rgba(220, 38, 38, 0.22);
+
+      --urg-bg: #fffbeb;
+      --urg-text: #d97706;
+      --urg-ring: rgba(217, 119, 6, 0.24);
+
+      --rout-bg: #f0fdf4;
+      --rout-text: #15803d;
+      --rout-ring: rgba(21, 128, 61, 0.2);
+
+      /* Dark Dock Tokens (Linear style) */
+      --dock-bg: #0f1115;
+      --dock-surface: #161920;
+      --dock-border: rgba(255, 255, 255, 0.08);
+      --dock-text: #f3f4f6;
+      --dock-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "liga" 1, "calt" 1;
+    }
+
+    /* =====================================================================
+       Split Workspace Layout (75% Left Dashboard / Draggable / 25% Right Nokia)
+       ===================================================================== */
+    .workspace {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .phc-pane {
+      width: 74%;
+      min-width: 520px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: var(--bg-canvas);
+      overflow: hidden;
+    }
+
+    .splitter {
+      width: 5px;
+      cursor: col-resize;
+      background: #e4e4e7;
+      transition: background 0.15s ease;
+      position: relative;
+      z-index: 30;
+      flex-shrink: 0;
+    }
+    .splitter:hover, .splitter.dragging {
+      background: #171717;
+    }
+
+    .phone-dock {
+      flex: 1;
+      min-width: 310px;
+      height: 100%;
+      background: var(--dock-bg);
+      color: var(--dock-text);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 18px 18px 16px;
+      overflow-y: auto;
+    }
+
+    /* =====================================================================
+       PHC Topbar
+       ===================================================================== */
+    .topbar {
+      height: 56px;
+      background: var(--bg-surface);
+      box-shadow: 0 1px 0 var(--border-ring);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #171717;
+    }
+    .brand-title {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-left: 10px;
+      border-left: 1px solid #e4e4e7;
+    }
+
+    .sim-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: #f4f4f5;
+      color: var(--text-secondary);
+      box-shadow: 0 0 0 1px var(--border-ring);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sim-pill .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #16a34a;
+    }
+
+    /* =====================================================================
+       Stats & Filters Bar
+       ===================================================================== */
+    .controls-section {
+      padding: 20px 24px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-card);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill-tabs {
+      display: inline-flex;
+      background: #ededf0;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 2px;
+    }
+    .pill-tab {
+      border: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .pill-tab.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .select-control, .search-input {
+      height: 32px;
+      background: var(--bg-surface);
+      border: none;
+      box-shadow: 0 0 0 1px var(--border-ring);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      color: var(--text-primary);
+      outline: none;
+    }
+    .search-input {
+      width: 210px;
+    }
+    .select-control:focus, .search-input:focus {
+      box-shadow: 0 0 0 2px #171717;
+    }
+
+    /* =====================================================================
+       Register Table
+       ===================================================================== */
+    .table-wrap {
+      flex: 1;
+      padding: 0 24px 24px;
+      overflow-y: auto;
+    }
+
+    .table-card {
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-card);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: #fafafa;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 10px 14px;
+      border-bottom: 1px solid #ececee;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f1f3;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+    tbody tr:hover {
+      background: #f8f8fa;
+    }
+    tbody tr.selected {
+      background: #f1f5f9;
+    }
+    tbody tr.flash-new {
+      animation: rowPulse 1.8s ease-out;
+    }
+    @keyframes rowPulse {
+      0% { background: #fef9c3; }
+      100% { background: transparent; }
+    }
+
+    td {
+      padding: 12px 14px;
+      vertical-align: middle;
+    }
+
+    .patient-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .patient-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .patient-sub {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .mono-val {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+
+    /* Badges */
+    .triage-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 9999px;
+    }
+    .triage-CRITICAL {
+      background: var(--crit-bg);
+      color: var(--crit-text);
+      box-shadow: 0 0 0 1px var(--crit-ring);
+    }
+    .triage-URGENT {
+      background: var(--urg-bg);
+      color: var(--urg-text);
+      box-shadow: 0 0 0 1px var(--urg-ring);
+    }
+    .triage-ROUTINE {
+      background: var(--rout-bg);
+      color: var(--rout-text);
+      box-shadow: 0 0 0 1px var(--rout-ring);
+    }
+
+    .verify-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 500;
+    }
+    .verify-VERIFIED {
+      background: #f4f4f5;
+      color: #18181b;
+    }
+    .verify-UNVERIFIED {
+      background: #fffbeb;
+      color: #b45309;
+      box-shadow: 0 0 0 1px rgba(180, 83, 9, 0.25);
+    }
+
+    /* 1-Click Action Pill */
+    .action-pill {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .action-pill.pending {
+      background: #171717;
+      color: #ffffff;
+    }
+    .action-pill.pending:hover {
+      background: #3f3f46;
+    }
+    .action-pill.done {
+      background: #f4f4f5;
+      color: #15803d;
+      box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.25);
+    }
+
+    /* =====================================================================
+       Slide-Over Patient & Step-by-Step Pipeline Inspector Drawer
+       ===================================================================== */
+    .drawer {
+      position: absolute;
+      top: 56px;
+      right: 0;
+      bottom: 0;
+      width: 470px;
+      max-width: 92%;
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-drawer);
+      z-index: 25;
+      transform: translateX(102%);
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #ececee;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .drawer-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .drawer-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .close-btn {
+      background: #f4f4f5;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+      color: var(--text-secondary);
+    }
+    .close-btn:hover {
+      background: #e4e4e7;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-heading {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .vital-box {
+      background: #fafafa;
+      box-shadow: 0 0 0 1px var(--border-ring);
+      border-radius: 7px;
+      padding: 10px;
+    }
+    .vital-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .vital-num {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 3px;
+    }
+
+    .symptom-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .symptom-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: #f4f4f5;
+      color: var(--text-primary);
+      box-shadow: 0 0 0 1px var(--border-ring);
+    }
+
+    /* Pipeline Turn Logs */
+    .turn-card {
+      background: #fafafa;
+      box-shadow: 0 0 0 1px var(--border-ring);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .turn-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #e4e4e7;
+    }
+
+    .step-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 8px;
+      font-size: 12px;
+      align-items: baseline;
+    }
+    .step-tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .step-val {
+      color: var(--text-primary);
+      line-height: 1.45;
+    }
+    .code-inline {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: #ffffff;
+      padding: 4px 7px;
+      border-radius: 5px;
+      box-shadow: 0 0 0 1px var(--border-ring);
+      display: block;
+      white-space: pre-wrap;
+    }
+
+    /* =====================================================================
+       Right 25%: Classic Nokia Feature Phone Simulator + Demo Controls
+       ===================================================================== */
+    .dock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .dock-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--dock-muted);
+    }
+    .dock-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #e5e7eb;
+    }
+
+    /* Nokia Body */
+    .nokia-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 4px 0 12px;
+    }
+    .nokia-body {
+      width: 236px;
+      background: linear-gradient(180deg, #272b35 0%, #1b1e26 100%);
+      border-radius: 34px 34px 28px 28px;
+      padding: 16px 16px 18px;
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.18),
+        0 12px 28px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .earpiece {
+      width: 44px;
+      height: 5px;
+      background: #0f1115;
+      border-radius: 999px;
+      margin: 0 auto;
+      box-shadow: inset 0 1px 1px rgba(0,0,0,0.8);
+    }
+
+    .nokia-brand {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: #9ca3af;
+      font-weight: 600;
+    }
+
+    /* Monochrome / Backlit LCD Screen */
+    .nokia-lcd {
+      background: #9ead86;
+      color: #141c0e;
+      border-radius: 8px;
+      padding: 10px;
+      height: 126px;
+      font-family: var(--font-mono);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.28),
+        0 0 0 2px #111318;
+       transition: background 0.2s ease;
+    }
+    .nokia-lcd.active-call {
+      background: #b7cc99;
+    }
+
+    .lcd-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(20, 28, 14, 0.25);
+      padding-bottom: 4px;
+    }
+    .lcd-main {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin: 4px 0;
+    }
+    .lcd-status {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .lcd-sub {
+      font-size: 10.5px;
+      line-height: 1.3;
+      opacity: 0.88;
+    }
+    .lcd-bottom {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 600;
+      border-top: 1px solid rgba(20, 28, 14, 0.2);
+      padding-top: 3px;
+    }
+
+    /* Call / Nav Keys */
+    .nokia-nav-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .nokia-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 8px 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      background: #2f3542;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 0 #0f1115;
+      transition: transform 0.08s ease;
+    }
+    .nokia-btn:active {
+      transform: translateY(1px);
+    }
+    .nokia-btn.call-green {
+      background: #15803d;
+    }
+    .nokia-btn.call-red {
+      background: #b91c1c;
+    }
+    .nokia-btn.over-btn {
+      background: #374151;
+      color: #fde047;
+    }
+
+    .nokia-keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .key-num {
+      background: #262a34;
+      border: none;
+      border-radius: 8px;
+      height: 30px;
+      color: #e5e7eb;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 0 #101217;
+    }
+    .key-num span {
+      font-size: 8px;
+      color: #9ca3af;
+      margin-left: 2px;
+      font-weight: 400;
+    }
+
+    /* Demo Controls Box underneath Nokia */
+    .demo-box {
+      background: var(--dock-surface);
+      border: 1px solid var(--dock-border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .demo-label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--dock-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .noise-Group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+    .noise-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--dock-border);
+      color: var(--dock-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 5px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .noise-btn.active {
+      background: #f3f4f6;
+      color: #111318;
+      font-weight: 600;
+    }
+
+    .scenario-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .scenario-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--dock-border);
+      color: var(--dock-text);
+      text-align: left;
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.12s ease;
+    }
+    .scenario-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+    }
+    .scenario-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="workspace">
+    <!-- =================================================================
+         LEFT 75%: PHC CLINIC DATABASE DASHBOARD
+         ================================================================= -->
+    <section class="phc-pane" id="phcPane">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <span class="brand-title">ASHA-Vani · PHC Rampur Register</span>
+          <span class="brand-sub">Decision Support & Early Warning (Not a diagnosis)</span>
+        </div>
+        <div class="sim-pill">
+          <span class="live-dot"></span>
+          SIMULATED TELEPHONY & ALERTS
+        </div>
+      </header>
+
+      <div class="controls-section">
+        <div class="summary-strip">
+          <div class="stat-card">
+            <span class="stat-label">Total Visits Today</span>
+            <span class="stat-value" id="statTotal">4</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Critical (Rule R1/R2/R4)</span>
+            <span class="stat-value" style="color: var(--crit-text);" id="statCrit">1</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Urgent (Rule R3/R5a/R8)</span>
+            <span class="stat-value" style="color: var(--urg-text);" id="statUrg">1</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Pending Referral Action</span>
+            <span class="stat-value" id="statPending">2</span>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <div class="pill-tabs" id="triageTabs">
+              <button class="pill-tab active" data-triage="ALL">All</button>
+              <button class="pill-tab" data-triage="CRITICAL">Critical</button>
+              <button class="pill-tab" data-triage="URGENT">Urgent</button>
+              <button class="pill-tab" data-triage="ROUTINE">Routine</button>
+            </div>
+
+            <select class="select-control" id="villageFilter">
+              <option value="ALL">All Villages (PHC Rampur)</option>
+              <option value="Rampur">Village: Rampur</option>
+              <option value="Belwa">Village: Belwa</option>
+            </select>
+
+            <select class="select-control" id="verifyFilter">
+              <option value="ALL">Status: All</option>
+              <option value="UNVERIFIED">Unverified (In Call)</option>
+              <option value="VERIFIED">Verified</option>
+            </select>
+          </div>
+
+          <input type="text" class="search-input" id="searchInput" placeholder="Search patient or ASHA..." />
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Village / Tola</th>
+                <th>ASHA Worker</th>
+                <th>Weeks</th>
+                <th>BP (mmHg)</th>
+                <th>Hb (g/dL)</th>
+                <th>Triage & Rule</th>
+                <th>Readback</th>
+                <th>Action (SIM)</th>
+              </tr>
+            </thead>
+            <tbody id="registerBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SLIDE-OVER PATIENT & TURN PIPELINE INSPECTOR DRAWER -->
+      <aside class="drawer" id="patientDrawer">
+        <div class="drawer-header">
+          <div>
+            <div class="drawer-title" id="drawerName">Pooja Devi</div>
+            <div class="drawer-meta" id="drawerMeta">W/o Ramesh Kumar · Rampur (Purani Basti) · Age 24</div>
+          </div>
+          <button class="close-btn" id="closeDrawerBtn" title="Close">✕</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+      </aside>
+    </section>
+
+    <!-- Draggable Split Divider -->
+    <div class="splitter" id="splitter" title="Drag to resize"></div>
+
+    <!-- =================================================================
+         RIGHT 25%: VILLAGE NOKIA FEATURE-PHONE SIMULATOR
+         ================================================================= -->
+    <aside class="phone-dock">
+      <div>
+        <div class="dock-header">
+          <span class="dock-title">ASHA Caller Simulator</span>
+          <span class="dock-badge">8kHz PCM16 · μ-law · SIM</span>
+        </div>
+
+        <div class="nokia-wrap">
+          <div class="nokia-body">
+            <div class="earpiece"></div>
+            <div class="nokia-brand">NOKIA · ASHA-SIM</div>
+
+            <div class="nokia-lcd" id="nokiaLcd">
+              <div class="lcd-top">
+                <span>BSNL-SIM</span>
+                <span id="lcdTimer">00:00</span>
+              </div>
+              <div class="lcd-main">
+                <div class="lcd-status" id="lcdStatus">Ready to Dial</div>
+                <div class="lcd-sub" id="lcdSub">PHC Toll-Free: 1800-ASHA<br/>Caller: Sunita (ASHA-001)</div>
+              </div>
+              <div class="lcd-bottom">
+                <span id="lcdDuplex">MIC IDLE</span>
+                <span id="lcdNoiseTag">CLEAN</span>
+              </div>
+            </div>
+
+            <div class="nokia-nav-row">
+              <button class="nokia-btn call-green" id="btnCall">CALL</button>
+              <button class="nokia-btn over-btn" id="btnOver" title="Finish speaking turn immediately">OVER ↵</button>
+              <button class="nokia-btn call-red" id="btnEnd">END</button>
+            </div>
+
+            <div class="nokia-keypad">
+              <button class="key-num">1<span>oo</span></button>
+              <button class="key-num">2<span>abc</span></button>
+              <button class="key-num">3<span>def</span></button>
+              <button class="key-num">4<span>ghi</span></button>
+              <button class="key-num">5<span>jkl</span></button>
+              <button class="key-num">6<span>mno</span></button>
+              <button class="key-num">7<span>pqrs</span></button>
+              <button class="key-num">8<span>tuv</span></button>
+              <button class="key-num">9<span>wxyz</span></button>
+              <button class="key-num">*</button>
+              <button class="key-num">0<span>+</span></button>
+              <button class="key-num">#</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compact Demo Controls Strip underneath Nokia -->
+      <div class="demo-box">
+        <div class="demo-label">
+          <span>Village Background Noise</span>
+          <span id="snrLabel">Off</span>
+        </div>
+        <div class="noise-Group" id="noiseGroup">
+          <button class="noise-btn active" data-noise="CLEAN">Clean</button>
+          <button class="noise-btn" data-noise="10dB">10 dB SNR</button>
+          <button class="noise-btn" data-noise="5dB">5 dB SNR</button>
+        </div>
+
+        <div class="demo-label" style="margin-top: 4px;">
+          <span>1-Click Demo Call Scenarios</span>
+          <span>Synthetic</span>
+        </div>
+        <div class="scenario-list">
+          <button class="scenario-btn" onclick="simulateScenario('critical')">
+            <span>1. Critical BP + Headache (R2)</span>
+            <span class="scenario-tag">2 Turns</span>
+          </button>
+          <button class="scenario-btn" onclick="simulateScenario('anemia')">
+            <span>2. Severe Anemia Hb 6.4 (R5a)</span>
+            <span class="scenario-tag">2 Turns</span>
+          </button>
+          <button class="scenario-btn" onclick="simulateScenario('garbled')">
+            <span>3. Garbled BP 310/95 → Safe Repeat</span>
+            <span class="scenario-tag">Refusal</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // =========================================================================
+    // Synthetic Register Data (With Step-by-Step STT -> LLM -> Rule Logs)
+    // =========================================================================
+    const visits = [
+      {
+        id: "v-101",
+        name: "Pooja Devi",
+        spouse: "Ramesh Kumar",
+        age: 24,
+        village: "Rampur",
+        tola: "Purani Basti",
+        asha: "Sunita Kumari (ASHA-001)",
+        weeks: 32,
+        bp_sys: 150,
+        bp_dia: 95,
+        hb: 9.8,
+        symptoms: ["SEVERE_HEADACHE"],
+        triage: "CRITICAL",
+        rules: ["R2"],
+        verification: "VERIFIED",
+        actionStatus: "PENDING",
+        turns: [
+          {
+            seq: 1,
+            stt: "Namaste, Rampur Purani Basti se Pooja Devi patni Ramesh Kumar, 32 hafte, BP dedh sau by pachhanve hai aur subah se tez sar dard hai over",
+            stt_ms: 142,
+            llm_json: {
+              gestational_weeks: 32,
+              bp_systolic: 150,
+              bp_diastolic: 95,
+              symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT", phrase: "tez sar dard" }]
+            },
+            llm_ms: 285,
+            validation: "PASS · Soft warning: confirm elevated BP (150/95)",
+            triage_decision: "CRITICAL — Rule R2 fired (BP ≥ 140/90 with severe headache)",
+            tts_reply: "Kripya confirm karein: Pooja Devi W/o Ramesh Kumar, 32 hafte, BP 1-5-0 by 9-5, lakshan: tez sar dard. Kya yeh sahi hai?"
+          },
+          {
+            seq: 2,
+            stt: "Haan ji bilkul sahi hai over",
+            stt_ms: 98,
+            llm_json: { confirmation: "YES" },
+            llm_ms: 160,
+            validation: "COMMITTED_VERIFIED",
+            triage_decision: "CRITICAL [R2] locked · PHC Alert queued (SIM)",
+            tts_reply: "Record verify ho gaya. Yeh CRITICAL screening hai (Rule R2). PHC Rampur ko turant suchit kiya gaya hai."
+          }
+        ]
+      },
+      {
+        id: "v-102",
+        name: "Kavita Devi",
+        spouse: "Sanjay Mahto",
+        age: 26,
+        village: "Belwa",
+        tola: "Dakshin Tola",
+        asha: "Meena Yadav (ASHA-002)",
+        weeks: 28,
+        bp_sys: 122,
+        bp_dia: 78,
+        hb: 6.5,
+        symptoms: ["SWELLING"],
+        triage: "URGENT",
+        rules: ["R5a"],
+        verification: "VERIFIED",
+        actionStatus: "PENDING",
+        turns: [
+          {
+            seq: 1,
+            stt: "Belwa se Kavita Devi, 28 hafte, BP 122 by 78 hai, khoon ki jaanch 6 point 5 aayi hai",
+            stt_ms: 155,
+            llm_json: {
+              gestational_weeks: 28,
+              bp_systolic: 122,
+              bp_diastolic: 78,
+              hb_g_dl: 6.5
+            },
+            llm_ms: 260,
+            validation: "PASS",
+            triage_decision: "URGENT — Rule R5a fired (Hb < 7.0 g/dL)",
+            tts_reply: "Kripya confirm karein: Kavita Devi, 28 hafte, BP 1-2-2 by 7-8, Hb 6 point 5. Kya yeh sahi hai?"
+          }
+        ]
+      },
+      {
+        id: "v-103",
+        name: "Rinki Kumari",
+        spouse: "Manoj Sah",
+        age: 21,
+        village: "Rampur",
+        tola: "Purani Basti",
+        asha: "Sunita Kumari (ASHA-001)",
+        weeks: 24,
+        bp_sys: 116,
+        bp_dia: 74,
+        hb: 11.2,
+        symptoms: [],
+        triage: "ROUTINE",
+        rules: [],
+        verification: "VERIFIED",
+        actionStatus: "DONE",
+        turns: [
+          {
+            seq: 1,
+            stt: "Rinki Kumari, 24 hafte, BP 116 by 74, Hb 11 point 2, sab theek hai",
+            stt_ms: 130,
+            llm_json: { gestational_weeks: 24, bp_systolic: 116, bp_diastolic: 74, hb_g_dl: 11.2 },
+            llm_ms: 230,
+            validation: "PASS",
+            triage_decision: "ROUTINE — No danger rules fired",
+            tts_reply: "Rinki Kumari ka routine ANC record darj ho gaya."
+          }
+        ]
+      }
+    ];
+
+    const TRIAGE_ORDER = { CRITICAL: 0, URGENT: 1, ROUTINE: 2 };
+    let activeTriageFilter = "ALL";
+    let selectedVisitId = "v-101";
+
+    const registerBody = document.getElementById("registerBody");
+    const patientDrawer = document.getElementById("patientDrawer");
+    const drawerName = document.getElementById("drawerName");
+    const drawerMeta = document.getElementById("drawerMeta");
+    const drawerBody = document.getElementById("drawerBody");
+
+    function renderTable(flashId = null) {
+      const villageVal = document.getElementById("villageFilter").value;
+      const verifyVal = document.getElementById("verifyFilter").value;
+      const query = document.getElementById("searchInput").value.trim().toLowerCase();
+
+      const filtered = visits
+        .filter(v => activeTriageFilter === "ALL" || v.triage === activeTriageFilter)
+        .filter(v => villageVal === "ALL" || v.village === villageVal)
+        .filter(v => verifyVal === "ALL" || v.verification === verifyVal)
+        .filter(v => !query || v.name.toLowerCase().includes(query) || v.asha.toLowerCase().includes(query))
+        .sort((a, b) => TRIAGE_ORDER[a.triage] - TRIAGE_ORDER[b.triage]);
+
+      registerBody.innerHTML = filtered.map(v => {
+        const ruleStr = v.rules.length ? ` · ${v.rules.join(",")}` : "";
+        const isSelected = v.id === selectedVisitId ? "selected" : "";
+        const isFlash = v.id === flashId ? "flash-new" : "";
+        const actionLabel = v.actionStatus === "DONE" ? "Referred ✓" : "Pending → Refer";
+        const actionClass = v.actionStatus === "DONE" ? "done" : "pending";
+
+        return `
+          <tr class="${isSelected} ${isFlash}" onclick="openDrawer('${v.id}')">
+            <td>
+              <div class="patient-cell">
+                <span class="patient-name">${v.name}</span>
+                <span class="patient-sub">W/o ${v.spouse} · Age ${v.age}</span>
+              </div>
+            </td>
+            <td>
+              <div class="patient-cell">
+                <span>${v.village}</span>
+                <span class="patient-sub">${v.tola}</span>
+              </div>
+            </td>
+            <td>${v.asha}</td>
+            <td class="mono-val">${v.weeks ?? "—"}w</td>
+            <td class="mono-val">${v.bp_sys ? `${v.bp_sys}/${v.bp_dia}` : "—"}</td>
+            <td class="mono-val">${v.hb ?? "—"}</td>
+            <td>
+              <span class="triage-badge triage-${v.triage}">${v.triage}${ruleStr}</span>
+            </td>
+            <td>
+              <span class="verify-badge verify-${v.verification}">
+                ${v.verification === "UNVERIFIED" ? "UNVERIFIED (In Call)" : "VERIFIED"}
+              </span>
+            </td>
+            <td onclick="event.stopPropagation()">
+              <button class="action-pill ${actionClass}" onclick="toggleAction('${v.id}')">
+                ${actionLabel}
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      // Update top summary counters
+      document.getElementById("statTotal").textContent = visits.length;
+      document.getElementById("statCrit").textContent = visits.filter(v => v.triage === "CRITICAL").length;
+      document.getElementById("statUrg").textContent = visits.filter(v => v.triage === "URGENT").length;
+      document.getElementById("statPending").textContent = visits.filter(v => v.actionStatus === "PENDING").length;
+    }
+
+    function toggleAction(id) {
+      const item = visits.find(v => v.id === id);
+      if (!item) return;
+      item.actionStatus = item.actionStatus === "DONE" ? "PENDING" : "DONE";
+      renderTable();
+      if (selectedVisitId === id) renderDrawerContent(item);
+    }
+
+    function openDrawer(id) {
+      selectedVisitId = id;
+      const item = visits.find(v => v.id === id);
+      if (!item) return;
+      renderDrawerContent(item);
+      patientDrawer.classList.add("open");
+      renderTable();
+    }
+
+    function renderDrawerContent(v) {
+      drawerName.textContent = v.name;
+      drawerMeta.textContent = `W/o ${v.spouse} · ${v.village} (${v.tola}) · Age ${v.age} · ${v.asha}`;
+
+      const symptomsHtml = v.symptoms.length
+        ? v.symptoms.map(s => `<span class="symptom-chip">${s}</span>`).join("")
+        : `<span class="symptom-chip" style="color: var(--text-muted)">None reported</span>`;
+
+      const turnsHtml = v.turns.map(t => `
+        <div class="turn-card">
+          <div class="turn-head">
+            <span>TURN #${t.seq}</span>
+            <span>STT ${t.stt_ms}ms · Graph ${t.llm_ms}ms</span>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">1. PRISMA STT</span>
+            <span class="step-val">"${t.stt}"</span>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">2. LLM EXTRACT</span>
+            <code class="code-inline">${JSON.stringify(t.llm_json, null, 2)}</code>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">3. VALIDATION</span>
+            <span class="step-val">${t.validation}</span>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">4. RULE ENGINE</span>
+            <span class="step-val" style="font-weight: 600;">${t.triage_decision}</span>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">5. TIMBRE TTS</span>
+            <span class="step-val" style="color: var(--text-secondary);">"${t.tts_reply}"</span>
+          </div>
+        </div>
+      `).join("");
+
+      drawerBody.innerHTML = `
+        <div>
+          <div class="section-heading">
+            <span>Sanitized Register Vitals</span>
+            <span class="triage-badge triage-${v.triage}">${v.triage} ${v.rules.length ? "(" + v.rules.join(", ") + ")" : ""}</span>
+          </div>
+          <div class="vitals-grid">
+            <div class="vital-box">
+              <div class="vital-label">Blood Pressure</div>
+              <div class="vital-num">${v.bp_sys ? `${v.bp_sys}/${v.bp_dia}` : "—"}</div>
+            </div>
+            <div class="vital-box">
+              <div class="vital-label">Hemoglobin</div>
+              <div class="vital-num">${v.hb ? `${v.hb} g/dL` : "—"}</div>
+            </div>
+            <div class="vital-box">
+              <div class="vital-label">Gestation</div>
+              <div class="vital-num">${v.weeks ? `${v.weeks} wks` : "—"}</div>
+            </div>
+          </div>
+          <div class="symptom-chips">${symptomsHtml}</div>
+        </div>
+
+        <div>
+          <div class="section-heading">
+            <span>Step-by-Step Voice & Rule Pipeline Log</span>
+            <span style="font-family: var(--font-mono); font-size: 10px;">LLM extracts · Code decides</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${turnsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    document.getElementById("closeDrawerBtn").addEventListener("click", () => {
+      patientDrawer.classList.remove("open");
+      selectedVisitId = null;
+      renderTable();
+    });
+
+    // Filters
+    document.querySelectorAll("#triageTabs .pill-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#triageTabs .pill-tab").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeTriageFilter = btn.dataset.triage;
+        renderTable();
+      });
+    });
+    document.getElementById("villageFilter").addEventListener("change", () => renderTable());
+    document.getElementById("verifyFilter").addEventListener("change", () => renderTable());
+    document.getElementById("searchInput").addEventListener("input", () => renderTable());
+
+    // Noise selector on Nokia dock
+    document.querySelectorAll("#noiseGroup .noise-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#noiseGroup .noise-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const mode = btn.dataset.noise;
+        document.getElementById("snrLabel").textContent = mode === "CLEAN" ? "Off" : mode;
+        document.getElementById("lcdNoiseTag").textContent = mode;
+      });
+    });
+
+    // =========================================================================
+    // Live Backend WebSocket (/ws/call & /ws/console) + Laptop Mic & Speaker
+    // =========================================================================
+    const nokiaLcd = document.getElementById("nokiaLcd");
+    const lcdStatus = document.getElementById("lcdStatus");
+    const lcdSub = document.getElementById("lcdSub");
+    const lcdDuplex = document.getElementById("lcdDuplex");
+    const lcdTimer = document.getElementById("lcdTimer");
+
+    let callWs = null;
+    let consoleWs = null;
+    let activeSessionId = null;
+    let recognition = null;
+    let isCallActive = false;
+    let isHalfDuplexMuted = false;
+    let pendingTranscript = "";
+    let callTimerInterval = null;
+    let callSeconds = 0;
+
+    function formatTimer(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, "0");
+      const s = String(sec % 60).padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function connectConsoleWebSocket() {
+      if (location.protocol === "file:") return;
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      consoleWs = new WebSocket(`${proto}//${location.host}/ws/console`);
+      consoleWs.onmessage = (ev) => {
+        try {
+          const event = JSON.parse(ev.data);
+          if (event.event_type === "turn_completed") {
+            applyLiveBackendTurn(event.session_id, event.payload);
+          }
+        } catch (err) {
+          console.warn("Console WS parse error:", err);
+        }
+      };
+    }
+
+    function applyLiveBackendTurn(sessionId, payload) {
+      const vid = `live-${sessionId}`;
+      let visit = visits.find(v => v.id === vid);
+      const patient = payload.patient || {};
+      const vals = payload.visit_values || {};
+      const triage = payload.triage || { level: "ROUTINE", rules_fired: [] };
+      const presentSymptoms = (vals.symptoms || [])
+        .filter(s => s.presence === "PRESENT")
+        .map(s => s.code);
+
+      const turnEntry = {
+        seq: payload.utterance_seq,
+        stt: payload.stt_transcript,
+        stt_ms: payload.latencies_ms?.stt ?? 120,
+        llm_json: payload.extracted_turn,
+        llm_ms: payload.latencies_ms?.graph ?? 180,
+        validation: (payload.validation_issues && payload.validation_issues.length)
+          ? payload.validation_issues.map(i => `${i.severity}: ${i.message}`).join(" | ")
+          : "PASS",
+        triage_decision: `${triage.level} — Rules: ${(triage.rules_fired || []).join(", ") || "none"}`,
+        tts_reply: payload.reply_text
+      };
+
+      if (!visit) {
+        visit = {
+          id: vid,
+          name: patient.full_name || `Caller (${sessionId})`,
+          spouse: patient.spouse_or_guardian_name || "—",
+          age: patient.age_years || "—",
+          village: patient.village || "Rampur",
+          tola: patient.tola || "—",
+          asha: "Sunita Kumari (ASHA-001 · Live)",
+          weeks: vals.gestational_weeks,
+          bp_sys: vals.bp_systolic,
+          bp_dia: vals.bp_diastolic,
+          hb: vals.hb_g_dl,
+          symptoms: presentSymptoms,
+          triage: triage.level,
+          rules: triage.rules_fired || [],
+          verification: payload.verification || "UNVERIFIED",
+          actionStatus: "PENDING",
+          turns: [turnEntry]
+        };
+        visits.unshift(visit);
+      } else {
+        if (patient.full_name) visit.name = patient.full_name;
+        if (patient.spouse_or_guardian_name) visit.spouse = patient.spouse_or_guardian_name;
+        if (patient.age_years) visit.age = patient.age_years;
+        if (patient.village) visit.village = patient.village;
+        if (patient.tola) visit.tola = patient.tola;
+        if (vals.gestational_weeks != null) visit.weeks = vals.gestational_weeks;
+        if (vals.bp_systolic != null) visit.bp_sys = vals.bp_systolic;
+        if (vals.bp_diastolic != null) visit.bp_dia = vals.bp_diastolic;
+        if (vals.hb_g_dl != null) visit.hb = vals.hb_g_dl;
+        visit.symptoms = presentSymptoms;
+        visit.triage = triage.level;
+        visit.rules = triage.rules_fired || [];
+        visit.verification = payload.verification || visit.verification;
+        if (!visit.turns.some(t => t.seq === turnEntry.seq)) {
+          visit.turns.push(turnEntry);
+        }
+      }
+
+      openDrawer(vid);
+      renderTable(vid);
+    }
+
+    function speakReplyHalfDuplex(text) {
+      if (!("speechSynthesis" in window) || !text) return;
+      isHalfDuplexMuted = true;
+      lcdStatus.textContent = "TTS Readback...";
+      lcdDuplex.textContent = "MIC MUTED (Half-Duplex)";
+
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "hi-IN";
+      utter.rate = 0.98;
+      utter.onend = () => {
+        // 200 ms anti-echo tail mute after TTS finishes
+        setTimeout(() => {
+          isHalfDuplexMuted = false;
+          if (isCallActive) {
+            lcdStatus.textContent = "Listening (Speak)...";
+            lcdDuplex.textContent = "MIC LIVE";
+          }
+        }, 200);
+      };
+      window.speechSynthesis.speak(utter);
+    }
+
+    function sendUtteranceToBackend(text) {
+      const cleaned = (text || "").trim();
+      if (!cleaned) return;
+      lcdSub.textContent = `Heard: "${cleaned}"`;
+
+      if (callWs && callWs.readyState === WebSocket.OPEN) {
+        callWs.send(JSON.stringify({
+          type: "utterance",
+          text: cleaned,
+          stt_latency_ms: 135
+        }));
+      } else if (location.protocol !== "file:") {
+        fetch("/api/turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: activeSessionId, transcript: cleaned })
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res.session_id) activeSessionId = res.session_id;
+            if (res.turn?.reply_text) speakReplyHalfDuplex(res.turn.reply_text);
+          });
+      }
+    }
+
+    function startLiveCall() {
+      if (isCallActive) return;
+      isCallActive = true;
+      callSeconds = 0;
+      nokiaLcd.classList.add("active-call");
+      lcdStatus.textContent = "Connecting PHC...";
+      lcdDuplex.textContent = "MIC LIVE";
+      lcdSub.textContent = "Speak in Hindi/English (say 'over' or click OVER)";
+
+      clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds += 1;
+        lcdTimer.textContent = formatTimer(callSeconds);
+      }, 1000);
+
+      if (location.protocol !== "file:") {
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        callWs = new WebSocket(`${proto}//${location.host}/ws/call`);
+        callWs.onopen = () => {
+          lcdStatus.textContent = "Listening (Speak)...";
+        };
+        callWs.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "call_started") {
+            activeSessionId = msg.session_id;
+          } else if (msg.type === "turn_reply") {
+            speakReplyHalfDuplex(msg.reply_text);
+          }
+        };
+      } else {
+        lcdStatus.textContent = "Listening (Local)...";
+      }
+
+      // Start browser microphone speech recognition (zero API keys needed)
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        recognition = new SpeechRec();
+        recognition.lang = "hi-IN";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          if (isHalfDuplexMuted) return;
+          let interim = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const txt = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              pendingTranscript = "";
+              sendUtteranceToBackend(txt);
+            } else {
+              interim += txt;
+              pendingTranscript = interim;
+              lcdSub.textContent = `Mic: "${interim}"`;
+              if (/\b(over|ओवर)\s*$/i.test(interim)) {
+                pendingTranscript = "";
+                sendUtteranceToBackend(interim);
+              }
+            }
+          }
+        };
+        recognition.onerror = () => {};
+        recognition.onend = () => {
+          if (isCallActive) {
+            try { recognition.start(); } catch (_) {}
+          }
+        };
+        try { recognition.start(); } catch (_) {}
+      } else {
+        lcdSub.textContent = "Click OVER to type/send a spoken turn";
+      }
+    }
+
+    function endLiveCall() {
+      isCallActive = false;
+      isHalfDuplexMuted = false;
+      clearInterval(callTimerInterval);
+      if (recognition) {
+        try { recognition.stop(); } catch (_) {}
+        recognition = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (callWs && callWs.readyState === WebSocket.OPEN) {
+        callWs.send(JSON.stringify({ type: "hangup" }));
+        callWs.close();
+      }
+      callWs = null;
+      nokiaLcd.classList.remove("active-call");
+      lcdStatus.textContent = "Call Ended";
+      lcdDuplex.textContent = "MIC IDLE";
+    }
+
+    document.getElementById("btnCall").addEventListener("click", startLiveCall);
+    document.getElementById("btnEnd").addEventListener("click", endLiveCall);
+    document.getElementById("btnOver").addEventListener("click", () => {
+      if (pendingTranscript.trim()) {
+        const toSend = pendingTranscript;
+        pendingTranscript = "";
+        sendUtteranceToBackend(toSend);
+      } else {
+        const manual = prompt(
+          "Speak or enter ASHA utterance (e.g. 'Pooja Devi, 32 hafte, BP 150 by 95 aur tez sar dard hai over'):",
+          "Pooja Devi patni Ramesh Kumar, Rampur Purani Basti, 32 hafte, BP 150 by 95 hai aur tez sar dard hai over"
+        );
+        if (manual) sendUtteranceToBackend(manual);
+      }
+    });
+
+    connectConsoleWebSocket();
+
+    function simulateScenario(kind) {
+      nokiaLcd.classList.add("active-call");
+      lcdStatus.textContent = "In Call · Turn 1";
+      lcdDuplex.textContent = "MIC LIVE";
+
+      if (kind === "critical") {
+        lcdSub.innerHTML = "Speaking: 'Anita Devi BP 165/112, sar dard... OVER'";
+        const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const liveVisit = {
+          id: newId,
+          name: "Anita Devi",
+          spouse: "Vijay Ram",
+          age: 29,
+          village: "Rampur",
+          tola: "Harijan Tola",
+          asha: "Sunita Kumari (ASHA-001)",
+          weeks: 34,
+          bp_sys: 165,
+          bp_dia: 112,
+          hb: 9.4,
+          symptoms: ["SEVERE_HEADACHE"],
+          triage: "CRITICAL",
+          rules: ["R1", "R2"],
+          verification: "UNVERIFIED",
+          actionStatus: "PENDING",
+          turns: [
+            {
+              seq: 1,
+              stt: "Rampur Harijan Tola se Anita Devi, 34 hafte, BP 165 by 112 hai aur tez sar dard hai over",
+              stt_ms: 138,
+              llm_json: { gestational_weeks: 34, bp_systolic: 165, bp_diastolic: 112, symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT" }] },
+              llm_ms: 272,
+              validation: "PASS · Soft warning: confirm severe BP (165/112)",
+              triage_decision: "CRITICAL — Rules R1, R2 fired (Provisional UNVERIFIED alert queued)",
+              tts_reply: "Kripya confirm karein: Anita Devi, 34 hafte, BP 1-6-5 by 1-1-2, tez sar dard. Kya yeh sahi hai?"
+            }
+          ]
+        };
+        visits.unshift(liveVisit);
+        openDrawer(newId);
+        renderTable(newId);
+
+        setTimeout(() => {
+          lcdStatus.textContent = "TTS Readback...";
+          lcdDuplex.textContent = "MIC MUTED (Half-Duplex)";
+        }, 900);
+
+        setTimeout(() => {
+          liveVisit.verification = "VERIFIED";
+          liveVisit.turns.push({
+            seq: 2,
+            stt: "Haan sahi hai over",
+            stt_ms: 92,
+            llm_json: { confirmation: "YES" },
+            llm_ms: 148,
+            validation: "COMMITTED_VERIFIED",
+            triage_decision: "CRITICAL [R1, R2] verified",
+            tts_reply: "Anita Devi ka record verify ho gaya. PHC ko CRITICAL alert bhej diya gaya hai."
+          });
+          lcdStatus.textContent = "Call Completed";
+          lcdDuplex.textContent = "MIC IDLE";
+          renderDrawerContent(liveVisit);
+          renderTable(newId);
+        }, 2600);
+      } else if (kind === "anemia") {
+        lcdSub.innerHTML = "Speaking: 'Sarita Kumari, 26w, Hb 6.4... OVER'";
+        const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const liveVisit = {
+          id: newId,
+          name: "Sarita Kumari",
+          spouse: "Pappu Yadav",
+          age: 19,
+          village: "Rampur",
+          tola: "Nayi Basti",
+          asha: "Sunita Kumari (ASHA-001)",
+          weeks: 26,
+          bp_sys: 118,
+          bp_dia: 76,
+          hb: 6.4,
+          symptoms: [],
+          triage: "URGENT",
+          rules: ["R5a"],
+          verification: "VERIFIED",
+          actionStatus: "PENDING",
+          turns: [
+            {
+              seq: 1,
+              stt: "Sarita Kumari Nayi Basti, 26 hafte, BP 118 by 76, hemoglobin 6 point 4 hai over",
+              stt_ms: 149,
+              llm_json: { gestational_weeks: 26, bp_systolic: 118, bp_diastolic: 76, hb_g_dl: 6.4 },
+              llm_ms: 251,
+              validation: "PASS",
+              triage_decision: "URGENT — Rule R5a fired (Hb < 7.0 g/dL)",
+              tts_reply: "Kripya confirm karein: Sarita Kumari, Hb 6 point 4. Record verify ho gaya."
+            }
+          ]
+        };
+        visits.unshift(liveVisit);
+        openDrawer(newId);
+        renderTable(newId);
+      } else if (kind === "garbled") {
+        lcdSub.innerHTML = "Noisy clip: 'BP 310 by 95...' → Hard Limit Refusal";
+        const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const liveVisit = {
+          id: newId,
+          name: "Guddi Devi",
+          spouse: "Raju Paswan",
+          age: 31,
+          village: "Belwa",
+          tola: "Dakshin Tola",
+          asha: "Meena Yadav (ASHA-002)",
+          weeks: 30,
+          bp_sys: null,
+          bp_dia: 95,
+          hb: 10.5,
+          symptoms: [],
+          triage: "ROUTINE",
+          rules: [],
+          verification: "UNVERIFIED",
+          actionStatus: "PENDING",
+          turns: [
+            {
+              seq: 1,
+              stt: "Guddi Devi, 30 hafte, BP 310 by 95 hai over",
+              stt_ms: 164,
+              llm_json: { gestational_weeks: 30, bp_systolic: 310, bp_diastolic: 95 },
+              llm_ms: 240,
+              validation: "REJECTED (ERROR: bp_systolic=310 outside hard range 60–260; cleared from record)",
+              triage_decision: "SAFE REFUSAL — Invalid BP never stored; routed to ask_repeat",
+              tts_reply: "Mujhe BP sahi sunai nahi diya (310 sambhav nahi hai). Kripya BP dobara batayein."
+            }
+          ]
+        };
+        visits.unshift(liveVisit);
+        openDrawer(newId);
+        renderTable(newId);
+      }
+    }
+
+    // Draggable 75/25 Split Divider
+    const splitter = document.getElementById("splitter");
+    const phcPane = document.getElementById("phcPane");
+    let isDragging = false;
+
+    splitter.addEventListener("mousedown", () => {
+      isDragging = true;
+      splitter.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const pct = Math.min(82, Math.max(55, (e.clientX / window.innerWidth) * 100));
+      phcPane.style.width = pct + "%";
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!isDragging) return;
+      isDragging = false;
+      splitter.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    });
+
+    // Initial render with Pooja Devi drawer open so you can see both right away
+    renderTable();
+    openDrawer("v-101");
+  </script>
+</body>
+</html>
+

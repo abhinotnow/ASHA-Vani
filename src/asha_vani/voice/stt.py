@@ -1,0 +1,111 @@
+"""Streaming Speech-to-Text (STT) interface, End-of-Utterance detector, and Fakes.
+
+Enforces AGENTS.md 4.2 Edge-Case Invariant #2:
+- Finish turn immediately if the ASHA ends with the trigger word `"over"` (and strip `"over"`).
+- Otherwise finish turn on natural pause (~1.2s silence / Prisma final utterance event).
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+import re
+from typing import Protocol
+
+DEFAULT_PAUSE_TIMEOUT_S: float = 1.2
+
+# Matches trailing "over" (or Hindi "ओवर") at the end of a spoken turn
+_TRAILING_OVER_RE = re.compile(
+    r"(?:\s+|\b)(?:over|ओवर)[\s\.,!?;:]*$",
+    re.IGNORECASE,
+)
+
+
+def strip_trailing_over(text: str) -> tuple[str, bool]:
+    """Check if `text` ends with the trigger word 'over'; return (cleaned_text, triggered)."""
+    stripped = text.strip()
+    if not stripped:
+        return "", False
+    match = _TRAILING_OVER_RE.search(stripped)
+    if match:
+        cleaned = stripped[: match.start()].strip(" ,.;:!?-")
+        return cleaned, True
+    return stripped, False
+
+
+@dataclass(frozen=True)
+class STTChunk:
+    """One event from a streaming STT engine (Gnani Prisma or FakeSTT)."""
+
+    text: str
+    is_final: bool = False
+
+
+class EndOfUtteranceDetector:
+    """Accumulates STT chunks and yields complete, cleaned utterances on 'over' or pause/final."""
+
+    def __init__(self, pause_timeout_s: float = DEFAULT_PAUSE_TIMEOUT_S) -> None:
+        self.pause_timeout_s = pause_timeout_s
+        self._final_segments: list[str] = []
+        self._latest_partial: str = ""
+
+    def feed(self, chunk: STTChunk) -> str | None:
+        """Feed a partial or final STT chunk. Returns a completed utterance string or None."""
+        text = chunk.text.strip()
+        if not text:
+            return None
+
+        cleaned, has_over = strip_trailing_over(text)
+        if has_over:
+            self._latest_partial = cleaned
+            return self.flush()
+
+        if chunk.is_final:
+            self._latest_partial = ""
+            self._final_segments.append(text)
+            return self.flush()
+
+        # Partial transcript without "over": replace latest partial preview, wait for final/pause
+        self._latest_partial = text
+        return None
+
+    def flush(self) -> str | None:
+        """Flush buffered text on silence timeout or end of stream."""
+        parts = list(self._final_segments)
+        if self._latest_partial:
+            parts.append(self._latest_partial)
+        self._final_segments.clear()
+        self._latest_partial = ""
+        if not parts:
+            return None
+        full = " ".join(p for p in parts if p).strip()
+        cleaned, _ = strip_trailing_over(full)
+        return cleaned or None
+
+    def clear(self) -> None:
+        """Discard partial text (used when half-duplex mutes the mic)."""
+        self._final_segments.clear()
+        self._latest_partial = ""
+
+
+class SpeechToText(Protocol):
+    """Protocol for streaming 8 kHz PCM16 1024-byte frames into STTChunks."""
+
+    async def stream(self, frames: AsyncIterator[bytes]) -> AsyncIterator[STTChunk]: ...
+
+
+class FakeSTT:
+    """Deterministic STT stub for unit tests, replay scripts, and load testing."""
+
+    def __init__(self, chunks: list[STTChunk | str]) -> None:
+        self._chunks: list[STTChunk] = [
+            c if isinstance(c, STTChunk) else STTChunk(text=c, is_final=True)
+            for c in chunks
+        ]
+
+    async def stream(self, frames: AsyncIterator[bytes]) -> AsyncIterator[STTChunk]:
+        # Consume at least one frame if available, then yield scripted chunks
+        async for _ in frames:
+            break
+        for chunk in self._chunks:
+            yield chunk
