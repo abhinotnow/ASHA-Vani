@@ -72,3 +72,80 @@ class FakeTTS:
         for _ in range(self.frames_per_reply):
             yield silence_frame
 
+
+class GnaniTimbreTTS:
+    """Live Gnani Timbre TTS client (`gnani.tts.GnaniTTSRealtimeClient` / `GnaniTTSClient`).
+
+    Follows the official `gnani-vachana` SDK rules:
+    - ALWAYS passes `model="timbre-v2.5"` explicitly (SDK default `timbre-v2.0` is retired and 400s).
+    - Defaults to `voice="Nalini"`, `language="hi-IN"` (or `voice="Poorvi"`, `language="auto"` for Hinglish).
+    - Uses `AudioConfig(sample_rate=8000, encoding="linear_pcm", container="raw")` when streaming
+      raw PCM frames, or `container="wav"` when returning a single playable browser WAV file.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        voice: str = "Nalini",
+        model: str = "timbre-v2.5",
+        language: str = "hi-IN",
+        speed: float = 1.0,
+        sample_rate: int = 8000,
+        container: str = "raw",
+    ) -> None:
+        if model == "timbre-v2.0":
+            raise ValueError("timbre-v2.0 is retired by Gnani API; use 'timbre-v2.5' or 'timbre-v3.0'.")
+        self.api_key = api_key
+        self.voice = voice
+        self.model = model
+        self.language = language
+        self.speed = speed
+        self.sample_rate = sample_rate
+        self.container = container
+
+    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+        """Stream synthesized audio chunks over WebSocket (`GnaniTTSRealtimeClient`)."""
+        from gnani.tts import AudioConfig, GnaniTTSRealtimeClient
+
+        audio_cfg = AudioConfig(
+            sample_rate=self.sample_rate,
+            encoding="linear_pcm",
+            num_channels=1,
+            sample_width=2,
+            container=self.container,
+        )
+        client_kwargs = {"api_key": self.api_key} if self.api_key else {}
+        async with GnaniTTSRealtimeClient(**client_kwargs) as client:
+            async for chunk in client.synthesize(
+                text,
+                voice=self.voice,
+                model=self.model,
+                language=self.language,
+                speed=self.speed,
+                audio_config=audio_cfg,
+            ):
+                if chunk:
+                    yield chunk
+
+    def synthesize_wav_bytes(self, text: str, sample_rate: int = 24000) -> bytes:
+        """Synchronous REST helper (`GnaniTTSClient`) returning a complete `.wav` byte buffer for browser `<audio>` playback."""
+        from gnani.tts import AudioConfig, GnaniTTSClient
+
+        audio_cfg = AudioConfig(
+            sample_rate=sample_rate,
+            encoding="linear_pcm",
+            num_channels=1,
+            sample_width=2,
+            container="wav",
+        )
+        client = GnaniTTSClient(api_key=self.api_key) if self.api_key else GnaniTTSClient()
+        return client.synthesize(
+            text,
+            voice=self.voice,
+            model=self.model,
+            language=self.language,
+            speed=self.speed,
+            audio_config=audio_cfg,
+        )
+

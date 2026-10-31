@@ -99,14 +99,14 @@
 
     .phone-dock {
       flex: 1;
-      min-width: 310px;
+      min-width: 320px;
       height: 100%;
       background: var(--dock-bg);
       color: var(--dock-text);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      padding: 18px 18px 16px;
+      gap: 12px;
+      padding: 16px 18px;
       overflow-y: auto;
     }
 
@@ -428,7 +428,7 @@
       top: 56px;
       right: 0;
       bottom: 0;
-      width: 470px;
+      width: 390px;
       max-width: 92%;
       background: var(--bg-surface);
       box-shadow: var(--shadow-drawer);
@@ -608,17 +608,26 @@
       color: #e5e7eb;
     }
 
-    /* Nokia Body */
+    /* Nokia Body — stretches to fill the dock cleanly */
+    .nokia-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
     .nokia-wrap {
+      flex: 1;
       display: flex;
       justify-content: center;
-      margin: 4px 0 12px;
+      min-height: 0;
     }
     .nokia-body {
-      width: 236px;
+      width: 100%;
+      max-width: 380px;
+      height: 100%;
       background: linear-gradient(180deg, #272b35 0%, #1b1e26 100%);
-      border-radius: 34px 34px 28px 28px;
-      padding: 16px 16px 18px;
+      border-radius: 30px;
+      padding: 18px 18px 20px;
       box-shadow:
         inset 0 1px 1px rgba(255, 255, 255, 0.18),
         0 12px 28px rgba(0, 0, 0, 0.45),
@@ -629,38 +638,42 @@
     }
 
     .earpiece {
-      width: 44px;
+      width: 54px;
       height: 5px;
       background: #0f1115;
       border-radius: 999px;
       margin: 0 auto;
       box-shadow: inset 0 1px 1px rgba(0,0,0,0.8);
+      flex-shrink: 0;
     }
 
     .nokia-brand {
       text-align: center;
       font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.22em;
+      font-size: 11px;
+      letter-spacing: 0.24em;
       color: #9ca3af;
       font-weight: 600;
+      flex-shrink: 0;
     }
 
-    /* Monochrome / Backlit LCD Screen */
+    /* Monochrome / Backlit LCD Screen — expands to fill available height */
     .nokia-lcd {
       background: #9ead86;
       color: #141c0e;
-      border-radius: 8px;
-      padding: 10px;
-      height: 126px;
+      border-radius: 10px;
+      padding: 12px 14px;
+      flex: 1;
+      min-height: 190px;
       font-family: var(--font-mono);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       box-shadow:
-        inset 0 2px 5px rgba(0, 0, 0, 0.28),
+        inset 0 2px 6px rgba(0, 0, 0, 0.28),
         0 0 0 2px #111318;
-       transition: background 0.2s ease;
+      transition: background 0.2s ease;
+      overflow: hidden;
     }
     .nokia-lcd.active-call {
       background: #b7cc99;
@@ -669,50 +682,58 @@
     .lcd-top {
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       border-bottom: 1px solid rgba(20, 28, 14, 0.25);
-      padding-bottom: 4px;
+      padding-bottom: 6px;
+      flex-shrink: 0;
     }
     .lcd-main {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      margin: 4px 0;
+      justify-content: center;
+      gap: 8px;
+      margin: 8px 0;
+      overflow-y: auto;
     }
     .lcd-status {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 700;
+      letter-spacing: -0.01em;
     }
     .lcd-sub {
-      font-size: 10.5px;
-      line-height: 1.3;
-      opacity: 0.88;
+      font-size: 12.5px;
+      line-height: 1.45;
+      opacity: 0.92;
+      word-break: break-word;
     }
     .lcd-bottom {
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       border-top: 1px solid rgba(20, 28, 14, 0.2);
-      padding-top: 3px;
+      padding-top: 6px;
+      flex-shrink: 0;
     }
 
     /* Call / Nav Keys */
     .nokia-nav-row {
       display: grid;
-      grid-template-columns: 1fr 1.2fr 1fr;
+      grid-template-columns: 1fr 1.35fr 1fr;
       gap: 8px;
       align-items: center;
+      flex-shrink: 0;
     }
 
     .nokia-btn {
       border: none;
       border-radius: 10px;
-      padding: 8px 6px;
+      padding: 11px 8px;
       font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
       color: #fff;
       background: #2f3542;
@@ -736,16 +757,17 @@
     .nokia-keypad {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      gap: 7px;
+      flex-shrink: 0;
     }
     .key-num {
       background: #262a34;
       border: none;
       border-radius: 8px;
-      height: 30px;
+      height: 34px;
       color: #e5e7eb;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 0 #101217;
@@ -900,7 +922,8 @@
           <table>
             <thead>
               <tr>
-                <th>Patient</th>
+                <th>Date & Time</th>
+                <th>Patient & Husband</th>
                 <th>Village / Tola</th>
                 <th>ASHA Worker</th>
                 <th>Weeks</th>
@@ -936,7 +959,7 @@
          RIGHT 25%: VILLAGE NOKIA FEATURE-PHONE SIMULATOR
          ================================================================= -->
     <aside class="phone-dock">
-      <div>
+      <div class="nokia-section">
         <div class="dock-header">
           <span class="dock-title">ASHA Caller Simulator</span>
           <span class="dock-badge">8kHz PCM16 · μ-law · SIM</span>
@@ -1021,12 +1044,21 @@
   </div>
 
   <script>
+    function formatNowTimestamp(isoStr = null) {
+      const d = isoStr ? new Date(isoStr) : new Date();
+      const datePart = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const timePart = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return `${datePart} · ${timePart}`;
+    }
+
     // =========================================================================
     // Synthetic Register Data (With Step-by-Step STT -> LLM -> Rule Logs)
     // =========================================================================
     const visits = [
       {
         id: "v-101",
+        recordedAt: "31 Oct 2026 · 02:14:22 PM",
+        whatHappened: "Severe BP 150/95 + Headache → Rule R2 CRITICAL verified",
         name: "Pooja Devi",
         spouse: "Ramesh Kumar",
         age: 24,
@@ -1045,6 +1077,8 @@
         turns: [
           {
             seq: 1,
+            timestamp: "31 Oct 2026 · 02:14:10 PM",
+            what_happened: "Captured Pooja Devi W/o Ramesh Kumar, 32w, BP 150/95, Severe Headache → Triggered Rule R2 CRITICAL",
             stt: "Namaste, Rampur Purani Basti se Pooja Devi patni Ramesh Kumar, 32 hafte, BP dedh sau by pachhanve hai aur subah se tez sar dard hai over",
             stt_ms: 142,
             llm_json: {
@@ -1060,6 +1094,8 @@
           },
           {
             seq: 2,
+            timestamp: "31 Oct 2026 · 02:14:22 PM",
+            what_happened: "ASHA confirmed readback ('Haan ji bilkul sahi hai') → Status flipped to VERIFIED",
             stt: "Haan ji bilkul sahi hai over",
             stt_ms: 98,
             llm_json: { confirmation: "YES" },
@@ -1072,6 +1108,8 @@
       },
       {
         id: "v-102",
+        recordedAt: "31 Oct 2026 · 01:40:05 PM",
+        whatHappened: "Severe Anemia Hb 6.5 g/dL → Rule R5a URGENT verified",
         name: "Kavita Devi",
         spouse: "Sanjay Mahto",
         age: 26,
@@ -1090,7 +1128,9 @@
         turns: [
           {
             seq: 1,
-            stt: "Belwa se Kavita Devi, 28 hafte, BP 122 by 78 hai, khoon ki jaanch 6 point 5 aayi hai",
+            timestamp: "31 Oct 2026 · 01:40:05 PM",
+            what_happened: "Captured Kavita Devi W/o Sanjay Mahto, 28w, BP 122/78, Hb 6.5 → Triggered Rule R5a URGENT",
+            stt: "Belwa se Kavita Devi patni Sanjay Mahto, 28 hafte, BP 122 by 78 hai, khoon ki jaanch 6 point 5 aayi hai",
             stt_ms: 155,
             llm_json: {
               gestational_weeks: 28,
@@ -1107,6 +1147,8 @@
       },
       {
         id: "v-103",
+        recordedAt: "31 Oct 2026 · 12:55:18 PM",
+        whatHappened: "Routine ANC checkup (24w, BP 116/74, Hb 11.2) → Normal",
         name: "Rinki Kumari",
         spouse: "Manoj Sah",
         age: 21,
@@ -1125,6 +1167,8 @@
         turns: [
           {
             seq: 1,
+            timestamp: "31 Oct 2026 · 12:55:18 PM",
+            what_happened: "Captured Rinki Kumari W/o Manoj Sah, 24w, BP 116/74, Hb 11.2 → Routine ANC logged",
             stt: "Rinki Kumari, 24 hafte, BP 116 by 74, Hb 11 point 2, sab theek hai",
             stt_ms: 130,
             llm_json: { gestational_weeks: 24, bp_systolic: 116, bp_diastolic: 74, hb_g_dl: 11.2 },
@@ -1153,11 +1197,15 @@
       const query = document.getElementById("searchInput").value.trim().toLowerCase();
 
       const filtered = visits
-        .filter(v => activeTriageFilter === "ALL" || v.triage === activeTriageFilter)
-        .filter(v => villageVal === "ALL" || v.village === villageVal)
-        .filter(v => verifyVal === "ALL" || v.verification === verifyVal)
+        .filter(v => v.isLive || activeTriageFilter === "ALL" || v.triage === activeTriageFilter)
+        .filter(v => v.isLive || villageVal === "ALL" || v.village === villageVal)
+        .filter(v => v.isLive || verifyVal === "ALL" || v.verification === verifyVal)
         .filter(v => !query || v.name.toLowerCase().includes(query) || v.asha.toLowerCase().includes(query))
-        .sort((a, b) => TRIAGE_ORDER[a.triage] - TRIAGE_ORDER[b.triage]);
+        .sort((a, b) => {
+          if (a.isLive && !b.isLive) return -1;
+          if (!a.isLive && b.isLive) return 1;
+          return TRIAGE_ORDER[a.triage] - TRIAGE_ORDER[b.triage];
+        });
 
       registerBody.innerHTML = filtered.map(v => {
         const ruleStr = v.rules.length ? ` · ${v.rules.join(",")}` : "";
@@ -1168,6 +1216,12 @@
 
         return `
           <tr class="${isSelected} ${isFlash}" onclick="openDrawer('${v.id}')">
+            <td>
+              <div class="patient-cell">
+                <span class="mono-val" style="font-size: 11px;">${v.recordedAt || formatNowTimestamp()}</span>
+                <span class="patient-sub" style="max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${v.whatHappened || ''}">${v.whatHappened || "Live ANC Call"}</span>
+              </div>
+            </td>
             <td>
               <div class="patient-cell">
                 <span class="patient-name">${v.name}</span>
@@ -1227,17 +1281,21 @@
 
     function renderDrawerContent(v) {
       drawerName.textContent = v.name;
-      drawerMeta.textContent = `W/o ${v.spouse} · ${v.village} (${v.tola}) · Age ${v.age} · ${v.asha}`;
+      drawerMeta.textContent = `W/o ${v.spouse} · ${v.village} (${v.tola}) · Age ${v.age} · Recorded: ${v.recordedAt || "Just now"}`;
 
       const symptomsHtml = v.symptoms.length
         ? v.symptoms.map(s => `<span class="symptom-chip">${s}</span>`).join("")
         : `<span class="symptom-chip" style="color: var(--text-muted)">None reported</span>`;
 
-      const turnsHtml = v.turns.map(t => `
+      const turnsHtml = v.turns.length ? v.turns.map(t => `
         <div class="turn-card">
           <div class="turn-head">
-            <span>TURN #${t.seq}</span>
+            <span>TURN #${t.seq} · ${t.timestamp || v.recordedAt || ""}</span>
             <span>STT ${t.stt_ms}ms · Graph ${t.llm_ms}ms</span>
+          </div>
+          <div class="step-row">
+            <span class="step-tag">WHAT HAPPENED</span>
+            <span class="step-val" style="font-weight: 600; color: #111827;">${t.what_happened || "Processed spoken turn"}</span>
           </div>
           <div class="step-row">
             <span class="step-tag">1. PRISMA STT</span>
@@ -1260,7 +1318,7 @@
             <span class="step-val" style="color: var(--text-secondary);">"${t.tts_reply}"</span>
           </div>
         </div>
-      `).join("");
+      `).join("") : `<div class="turn-card" style="color: var(--text-muted); font-size: 12px;">Live call connected — waiting for Turn #1 (speak into mic or click OVER ↵)...</div>`;
 
       drawerBody.innerHTML = `
         <div>
@@ -1342,9 +1400,13 @@
     let recognition = null;
     let isCallActive = false;
     let isHalfDuplexMuted = false;
-    let pendingTranscript = "";
+    let accumulatedSpeech = "";
+    let interimSpeech = "";
+    let silenceDebounceTimer = null;
+    let activeAudio = null;
     let callTimerInterval = null;
     let callSeconds = 0;
+    const SILENCE_WAIT_MS = 5000; // Wait 5.0 full seconds of silence (or say/click 'OVER') so ASHA can think & speak slowly
 
     function formatTimer(sec) {
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
@@ -1354,48 +1416,125 @@
 
     function connectConsoleWebSocket() {
       if (location.protocol === "file:") return;
+      if (consoleWs && (consoleWs.readyState === WebSocket.OPEN || consoleWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       consoleWs = new WebSocket(`${proto}//${location.host}/ws/console`);
       consoleWs.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
-          if (event.event_type === "turn_completed") {
-            applyLiveBackendTurn(event.session_id, event.payload);
+          if (event.event_type === "call_started" && event.session_id === activeSessionId) {
+            ensureLiveVisitStarted(event.session_id, event.timestamp);
+          } else if (event.event_type === "turn_completed") {
+            applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
           }
         } catch (err) {
           console.warn("Console WS parse error:", err);
         }
       };
+      consoleWs.onclose = () => {
+        setTimeout(connectConsoleWebSocket, 1500);
+      };
     }
 
-    function applyLiveBackendTurn(sessionId, payload) {
+    function ensureLiveVisitStarted(sessionId, eventIsoTime = null) {
+      if (!sessionId) return;
+      const vid = `live-${sessionId}`;
+      let visit = visits.find(v => v.id === vid);
+      const formattedTime = formatNowTimestamp(eventIsoTime);
+      if (!visit) {
+        visit = {
+          id: vid,
+          isLive: true,
+          recordedAt: formattedTime,
+          whatHappened: "Call Connected → Asking for Patient Name & Village",
+          name: "Listening for Patient Name...",
+          spouse: "Pending...",
+          age: "—",
+          village: "Rampur",
+          tola: "—",
+          asha: "Sunita Kumari (ASHA-001 · Live)",
+          weeks: null,
+          bp_sys: null,
+          bp_dia: null,
+          hb: null,
+          symptoms: [],
+          triage: "ROUTINE",
+          rules: [],
+          verification: "UNVERIFIED",
+          actionStatus: "PENDING",
+          turns: []
+        };
+        visits.unshift(visit);
+      }
+      openDrawer(vid);
+      renderTable(vid);
+    }
+
+    function describeWhatHappened(payload, patient, vals, triage) {
+      const actionLabels = {
+        ASK_PATIENT_NAME: "Asking for Patient Name & Village",
+        ASK_SPOUSE_NAME: "Asking for Husband / Spouse Name",
+        ASK_WEEKS: "Asking for Pregnancy Weeks",
+        ASK_BP: "Asking for Blood Pressure (BP)",
+        ASK_HB: "Asking for Hemoglobin (Hb) & Symptoms",
+        REPEAT_VALUE: "Validation refused out-of-range value → Asking to repeat",
+        CONFIRM_VALUES: `All checks captured → Reading back for confirmation (${triage.level})`,
+        COMMITTED_VERIFIED: `Confirmed & Verified (${triage.level})`
+      };
+      const nextStep = actionLabels[payload.next_action] || payload.next_action || "Updated visit";
+      const parts = [];
+      if (patient.full_name) parts.push(`Patient: ${patient.full_name}`);
+      if (patient.spouse_or_guardian_name) parts.push(`W/o ${patient.spouse_or_guardian_name}`);
+      if (vals.gestational_weeks != null) parts.push(`${vals.gestational_weeks}w`);
+      if (vals.bp_systolic != null && vals.bp_diastolic != null) parts.push(`BP ${vals.bp_systolic}/${vals.bp_diastolic}`);
+      if (vals.hb_g_dl != null) parts.push(`Hb ${vals.hb_g_dl}`);
+      const capturedStr = parts.length ? parts.join(", ") : "Greeting / Initial turn";
+      return `${capturedStr} → ${nextStep}`;
+    }
+
+    function applyLiveBackendTurn(sessionId, payload, eventIsoTime = null) {
+      if (!sessionId || !payload) return;
       const vid = `live-${sessionId}`;
       let visit = visits.find(v => v.id === vid);
       const patient = payload.patient || {};
       const vals = payload.visit_values || {};
-      const triage = payload.triage || { level: "ROUTINE", rules_fired: [] };
+      const triage = payload.triage || payload.triage_result || { level: "ROUTINE", rules_fired: [] };
+      const valIssues = payload.validation_issues || payload.validation_result?.issues || [];
+      const transcriptText = payload.stt_transcript || payload.transcript || "";
       const presentSymptoms = (vals.symptoms || [])
         .filter(s => s.presence === "PRESENT")
         .map(s => s.code);
+      const formattedTime = formatNowTimestamp(eventIsoTime);
+      const summaryText = describeWhatHappened(payload, patient, vals, triage);
 
       const turnEntry = {
         seq: payload.utterance_seq,
-        stt: payload.stt_transcript,
+        timestamp: formattedTime,
+        what_happened: summaryText,
+        stt: transcriptText,
         stt_ms: payload.latencies_ms?.stt ?? 120,
-        llm_json: payload.extracted_turn,
+        llm_json: {
+          patient: patient,
+          extracted_turn: payload.extracted_turn
+        },
         llm_ms: payload.latencies_ms?.graph ?? 180,
-        validation: (payload.validation_issues && payload.validation_issues.length)
-          ? payload.validation_issues.map(i => `${i.severity}: ${i.message}`).join(" | ")
+        validation: valIssues.length
+          ? valIssues.map(i => `${i.severity}: ${i.message}`).join(" | ")
           : "PASS",
-        triage_decision: `${triage.level} — Rules: ${(triage.rules_fired || []).join(", ") || "none"}`,
+        triage_decision: `${triage.level} — Rules: ${(triage.rules_fired || []).join(", ") || "none"} · Next: ${payload.next_action}`,
         tts_reply: payload.reply_text
       };
 
       if (!visit) {
         visit = {
           id: vid,
-          name: patient.full_name || `Caller (${sessionId})`,
-          spouse: patient.spouse_or_guardian_name || "—",
+          isLive: true,
+          recordedAt: formattedTime,
+          whatHappened: summaryText,
+          name: patient.full_name || "Listening for Patient Name...",
+          spouse: patient.spouse_or_guardian_name || "Pending...",
           age: patient.age_years || "—",
           village: patient.village || "Rampur",
           tola: patient.tola || "—",
@@ -1413,6 +1552,9 @@
         };
         visits.unshift(visit);
       } else {
+        visit.isLive = true;
+        visit.recordedAt = formattedTime;
+        visit.whatHappened = summaryText;
         if (patient.full_name) visit.name = patient.full_name;
         if (patient.spouse_or_guardian_name) visit.spouse = patient.spouse_or_guardian_name;
         if (patient.age_years) visit.age = patient.age_years;
@@ -1426,8 +1568,11 @@
         visit.triage = triage.level;
         visit.rules = triage.rules_fired || [];
         visit.verification = payload.verification || visit.verification;
-        if (!visit.turns.some(t => t.seq === turnEntry.seq)) {
+        const existingIdx = visit.turns.findIndex(t => t.seq === turnEntry.seq);
+        if (existingIdx === -1) {
           visit.turns.push(turnEntry);
+        } else {
+          visit.turns[existingIdx] = turnEntry;
         }
       }
 
@@ -1435,33 +1580,95 @@
       renderTable(vid);
     }
 
-    function speakReplyHalfDuplex(text) {
-      if (!("speechSynthesis" in window) || !text) return;
+    function pauseMicForTTS() {
       isHalfDuplexMuted = true;
-      lcdStatus.textContent = "TTS Readback...";
+      clearTimeout(silenceDebounceTimer);
+      accumulatedSpeech = "";
+      interimSpeech = "";
+      lcdStatus.textContent = "System Speaking...";
       lcdDuplex.textContent = "MIC MUTED (Half-Duplex)";
+      if (recognition) {
+        try { recognition.abort(); } catch (_) {}
+      }
+    }
 
+    function resumeMicAfterTTS() {
+      // 300 ms anti-echo tail mute after speaker audio completely finishes
+      setTimeout(() => {
+        if (!isCallActive) return;
+        isHalfDuplexMuted = false;
+        accumulatedSpeech = "";
+        interimSpeech = "";
+        lcdStatus.textContent = "Listening (Speak)...";
+        lcdDuplex.textContent = "MIC LIVE";
+        if (recognition) {
+          try { recognition.start(); } catch (_) {}
+        }
+      }, 300);
+    }
+
+    function speakWithBrowserTTS(text) {
+      if (!("speechSynthesis" in window) || !text) {
+        resumeMicAfterTTS();
+        return;
+      }
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = "hi-IN";
       utter.rate = 0.98;
-      utter.onend = () => {
-        // 200 ms anti-echo tail mute after TTS finishes
-        setTimeout(() => {
-          isHalfDuplexMuted = false;
-          if (isCallActive) {
-            lcdStatus.textContent = "Listening (Speak)...";
-            lcdDuplex.textContent = "MIC LIVE";
-          }
-        }, 200);
-      };
+      utter.onend = () => resumeMicAfterTTS();
+      utter.onerror = () => resumeMicAfterTTS();
       window.speechSynthesis.speak(utter);
     }
 
+    function speakReplyHalfDuplex(text) {
+      if (!text) return;
+      pauseMicForTTS();
+      lcdSub.textContent = `ASHA-Vani: "${text}"`;
+
+      if (location.protocol !== "file:") {
+        fetch(`/api/tts?text=${encodeURIComponent(text)}`)
+          .then(res => {
+            if (res.status === 200) return res.blob();
+            return null;
+          })
+          .then(blob => {
+            if (!blob || !isCallActive) {
+              if (isCallActive) speakWithBrowserTTS(text);
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            if (activeAudio) {
+              try { activeAudio.pause(); } catch (_) {}
+            }
+            activeAudio = new Audio(url);
+            activeAudio.onended = () => {
+              URL.revokeObjectURL(url);
+              resumeMicAfterTTS();
+            };
+            activeAudio.onerror = () => {
+              URL.revokeObjectURL(url);
+              resumeMicAfterTTS();
+            };
+            activeAudio.play().catch(() => speakWithBrowserTTS(text));
+          })
+          .catch(() => speakWithBrowserTTS(text));
+      } else {
+        speakWithBrowserTTS(text);
+      }
+    }
+
     function sendUtteranceToBackend(text) {
-      const cleaned = (text || "").trim();
+      clearTimeout(silenceDebounceTimer);
+      const cleaned = (text || "").replace(/\b(over|ओवर)\s*[.,!?]*$/i, "").trim();
+      accumulatedSpeech = "";
+      interimSpeech = "";
       if (!cleaned) return;
-      lcdSub.textContent = `Heard: "${cleaned}"`;
+
+      // Immediately mute mic while backend + TTS processes the turn
+      pauseMicForTTS();
+      lcdStatus.textContent = "Processing Turn...";
+      lcdSub.textContent = `You said: "${cleaned}"`;
 
       if (callWs && callWs.readyState === WebSocket.OPEN) {
         callWs.send(JSON.stringify({
@@ -1478,6 +1685,7 @@
           .then(r => r.json())
           .then(res => {
             if (res.session_id) activeSessionId = res.session_id;
+            if (res.turn) applyLiveBackendTurn(res.session_id, res.turn);
             if (res.turn?.reply_text) speakReplyHalfDuplex(res.turn.reply_text);
           });
       }
@@ -1487,10 +1695,13 @@
       if (isCallActive) return;
       isCallActive = true;
       callSeconds = 0;
+      accumulatedSpeech = "";
+      interimSpeech = "";
+      connectConsoleWebSocket();
       nokiaLcd.classList.add("active-call");
       lcdStatus.textContent = "Connecting PHC...";
-      lcdDuplex.textContent = "MIC LIVE";
-      lcdSub.textContent = "Speak in Hindi/English (say 'over' or click OVER)";
+      lcdDuplex.textContent = "MIC MUTED (Greeting)";
+      lcdSub.textContent = "Connecting to ASHA-Vani...";
 
       clearInterval(callTimerInterval);
       callTimerInterval = setInterval(() => {
@@ -1498,70 +1709,92 @@
         lcdTimer.textContent = formatTimer(callSeconds);
       }, 1000);
 
-      if (location.protocol !== "file:") {
-        const proto = location.protocol === "https:" ? "wss:" : "ws:";
-        callWs = new WebSocket(`${proto}//${location.host}/ws/call`);
-        callWs.onopen = () => {
-          lcdStatus.textContent = "Listening (Speak)...";
-        };
-        callWs.onmessage = (ev) => {
-          const msg = JSON.parse(ev.data);
-          if (msg.type === "call_started") {
-            activeSessionId = msg.session_id;
-          } else if (msg.type === "turn_reply") {
-            speakReplyHalfDuplex(msg.reply_text);
-          }
-        };
-      } else {
-        lcdStatus.textContent = "Listening (Local)...";
-      }
-
-      // Start browser microphone speech recognition (zero API keys needed)
+      // Set up browser speech recognition in 'en-IN' (captures Hindi + English speech in Roman/English script!)
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRec) {
         recognition = new SpeechRec();
-        recognition.lang = "hi-IN";
+        recognition.lang = "en-IN";
         recognition.continuous = true;
         recognition.interimResults = true;
 
         recognition.onresult = (event) => {
-          if (isHalfDuplexMuted) return;
-          let interim = "";
+          if (isHalfDuplexMuted || !isCallActive) return;
+          clearTimeout(silenceDebounceTimer);
+
+          let currentInterim = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            const txt = event.results[i][0].transcript;
+            const phrase = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              pendingTranscript = "";
-              sendUtteranceToBackend(txt);
+              accumulatedSpeech = (accumulatedSpeech + " " + phrase).trim();
             } else {
-              interim += txt;
-              pendingTranscript = interim;
-              lcdSub.textContent = `Mic: "${interim}"`;
-              if (/\b(over|ओवर)\s*$/i.test(interim)) {
-                pendingTranscript = "";
-                sendUtteranceToBackend(interim);
-              }
+              currentInterim += phrase;
             }
+          }
+          interimSpeech = currentInterim.trim();
+          const fullPreview = (accumulatedSpeech + " " + interimSpeech).trim();
+          if (fullPreview) {
+            lcdSub.textContent = `Mic: "${fullPreview}"`;
+          }
+
+          // Flush immediately if user says "over", else wait 5.0 seconds of silence
+          if (/\b(over|ओवर)\s*[.,!?]*$/i.test(fullPreview)) {
+            sendUtteranceToBackend(fullPreview);
+          } else if (fullPreview) {
+            silenceDebounceTimer = setTimeout(() => {
+              const toSend = (accumulatedSpeech + " " + interimSpeech).trim();
+              if (toSend && !isHalfDuplexMuted && isCallActive) {
+                sendUtteranceToBackend(toSend);
+              }
+            }, SILENCE_WAIT_MS);
           }
         };
         recognition.onerror = () => {};
         recognition.onend = () => {
-          if (isCallActive) {
+          if (isCallActive && !isHalfDuplexMuted) {
             try { recognition.start(); } catch (_) {}
           }
         };
-        try { recognition.start(); } catch (_) {}
+      }
+
+      if (location.protocol !== "file:") {
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        callWs = new WebSocket(`${proto}//${location.host}/ws/call`);
+        callWs.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "call_started") {
+            activeSessionId = msg.session_id;
+            ensureLiveVisitStarted(msg.session_id);
+            // Speak the initial Hinglish greeting first, then open mic when done!
+            speakReplyHalfDuplex(
+              msg.greeting_text ||
+              "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
+            );
+          } else if (msg.type === "turn_reply") {
+            if (msg.turn) {
+              applyLiveBackendTurn(msg.session_id || activeSessionId, msg.turn);
+            }
+            speakReplyHalfDuplex(msg.reply_text);
+          }
+        };
       } else {
-        lcdSub.textContent = "Click OVER to type/send a spoken turn";
+        speakReplyHalfDuplex(
+          "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
+        );
       }
     }
 
     function endLiveCall() {
       isCallActive = false;
       isHalfDuplexMuted = false;
+      clearTimeout(silenceDebounceTimer);
       clearInterval(callTimerInterval);
       if (recognition) {
-        try { recognition.stop(); } catch (_) {}
+        try { recognition.abort(); } catch (_) {}
         recognition = null;
+      }
+      if (activeAudio) {
+        try { activeAudio.pause(); } catch (_) {}
+        activeAudio = null;
       }
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       if (callWs && callWs.readyState === WebSocket.OPEN) {
@@ -1577,14 +1810,13 @@
     document.getElementById("btnCall").addEventListener("click", startLiveCall);
     document.getElementById("btnEnd").addEventListener("click", endLiveCall);
     document.getElementById("btnOver").addEventListener("click", () => {
-      if (pendingTranscript.trim()) {
-        const toSend = pendingTranscript;
-        pendingTranscript = "";
-        sendUtteranceToBackend(toSend);
+      const currentSpoken = (accumulatedSpeech + " " + interimSpeech).trim();
+      if (currentSpoken) {
+        sendUtteranceToBackend(currentSpoken);
       } else {
         const manual = prompt(
-          "Speak or enter ASHA utterance (e.g. 'Pooja Devi, 32 hafte, BP 150 by 95 aur tez sar dard hai over'):",
-          "Pooja Devi patni Ramesh Kumar, Rampur Purani Basti, 32 hafte, BP 150 by 95 hai aur tez sar dard hai over"
+          "Enter ASHA utterance in Hinglish/English:",
+          "Rampur se Pooja Devi patni Ramesh Kumar, 32 hafte, BP 150 by 95 hai aur tez sar dard hai"
         );
         if (manual) sendUtteranceToBackend(manual);
       }

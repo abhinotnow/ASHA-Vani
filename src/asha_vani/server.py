@@ -8,21 +8,32 @@ Pipeline Inspector update in real time.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 import uuid
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from asha_vani.voice.events import CallEvent
 from asha_vani.voice.session import CallSession
-from asha_vani.voice.tts import FakeTTS
+from asha_vani.voice.stt import GnaniPrismaSTT
+from asha_vani.voice.tts import FakeTTS, FixedScriptCache, GnaniTimbreTTS, TextToSpeech
 from asha_vani.voice.turn_runner import LangGraphTurnRunner
 
+load_dotenv()
 _SIMULATOR_HTML_PATH = Path(__file__).resolve().parent / "voice" / "simulator.html"
+
+# In-memory WAV cache so identical prompts (greeting, follow-ups, repeats) cost 0 extra Gnani credits
+_TTS_WAV_CACHE: dict[str, bytes] = {}
+INITIAL_GREETING_HINGLISH = (
+    "Namaste Didi! ASHA-Vani mein aapka swagat hai. "
+    "Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
+)
 
 app = FastAPI(title="ASHA-Vani Voice & PHC Server", version="0.1.0")
 app.add_middleware(
@@ -66,7 +77,7 @@ class WebSocketConsoleBroadcaster:
 
 
 broadcaster = WebSocketConsoleBroadcaster()
-shared_turn_runner = LangGraphTurnRunner()
+shared_turn_runner = LangGraphTurnRunner(require_full_checklist=True)
 active_sessions: dict[str, CallSession] = {}
 
 
@@ -74,9 +85,48 @@ active_sessions: dict[str, CallSession] = {}
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
+        "gnani_configured": bool(os.getenv("GNANI_API_KEY", "").strip()),
         "active_calls": len(active_sessions),
         "console_clients": len(broadcaster.clients),
     }
+
+
+@app.get("/api/tts")
+def synthesize_tts_wav(
+    text: str,
+    voice: str | None = None,
+    language: str | None = None,
+) -> Response:
+    """Synthesize a WAV audio clip using Gnani Timbre v2.5 (`GnaniTTSClient`) with in-memory caching."""
+    api_key = os.getenv("GNANI_API_KEY", "").strip()
+    if not api_key:
+        return Response(content=b"", status_code=204)
+
+    # Default to Poorvi + auto for Roman Hinglish, or respect .env override
+    chosen_voice = voice or os.getenv("GNANI_TTS_VOICE", "Poorvi")
+    chosen_lang = language or os.getenv("GNANI_TTS_LANG", "auto")
+    # If .env has Nalini + hi-IN, Poorvi/auto handles Roman Hinglish much more naturally;
+    # keep user choice if explicitly set, and cache by (voice, lang, text)
+    cache_key = f"{chosen_voice}:{chosen_lang}:{text.strip()}"
+    if cache_key in _TTS_WAV_CACHE:
+        return Response(content=_TTS_WAV_CACHE[cache_key], media_type="audio/wav")
+
+    try:
+        tts = GnaniTimbreTTS(
+            api_key=api_key,
+            voice=chosen_voice,
+            model="timbre-v2.5",
+            language=chosen_lang,
+        )
+        wav_bytes = tts.synthesize_wav_bytes(text)
+    except Exception:
+        # Fallback to Nalini + hi-IN if voice/lang pair was rejected
+        tts = GnaniTimbreTTS(api_key=api_key, voice="Nalini", model="timbre-v2.5", language="hi-IN")
+        wav_bytes = tts.synthesize_wav_bytes(text)
+
+    if len(_TTS_WAV_CACHE) < 128:
+        _TTS_WAV_CACHE[cache_key] = wav_bytes
+    return Response(content=wav_bytes, media_type="audio/wav")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -161,7 +211,13 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
     )
     active_sessions[sid] = session
     await session.start()
-    await ws.send_json({"type": "call_started", "session_id": sid})
+    await ws.send_json(
+        {
+            "type": "call_started",
+            "session_id": sid,
+            "greeting_text": INITIAL_GREETING_HINGLISH,
+        }
+    )
 
     end_reason = "DROPPED"
     try:

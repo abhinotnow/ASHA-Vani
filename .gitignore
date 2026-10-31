@@ -17,3 +17,6 @@ wheels/
 .agents/
 .claude/
 graphify-out/
+brag-output/
+brag-output-*/
+

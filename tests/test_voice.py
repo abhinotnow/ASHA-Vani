@@ -21,8 +21,8 @@ from asha_vani.voice.audio import (
 )
 from asha_vani.voice.events import CallEventType, InMemoryEventSink
 from asha_vani.voice.session import CallSession, HalfDuplexGate
-from asha_vani.voice.stt import EndOfUtteranceDetector, STTChunk, strip_trailing_over
-from asha_vani.voice.tts import FakeTTS, FixedScriptCache, FIXED_SCRIPTS
+from asha_vani.voice.stt import EndOfUtteranceDetector, GnaniPrismaSTT, STTChunk, strip_trailing_over
+from asha_vani.voice.tts import FakeTTS, FixedScriptCache, FIXED_SCRIPTS, GnaniTimbreTTS
 from asha_vani.voice.turn_runner import LangGraphTurnRunner, VerificationStatus
 
 
@@ -211,4 +211,114 @@ def test_call_session_safe_refusal_on_hard_invalid_bp_and_dropped_call() -> None
         assert end_ev.payload["final_verification"] == "INCOMPLETE"
 
     asyncio.run(_run())
+
+
+def test_gnani_prisma_and_timbre_configs_and_devanagari_turn_flow() -> None:
+    import pytest
+
+    # Timbre v2.0 is retired by Gnani API and must raise ValueError immediately
+    with pytest.raises(ValueError, match="timbre-v2.0"):
+        GnaniTimbreTTS(model="timbre-v2.0")
+
+    tts_client = GnaniTimbreTTS()
+    assert tts_client.model == "timbre-v2.5"
+    assert tts_client.voice == "Nalini"
+    assert tts_client.language == "hi-IN"
+
+    stt_client = GnaniPrismaSTT()
+    assert stt_client.language_code == "hi-IN"
+    assert stt_client.sample_rate == 8000
+    assert stt_client.format == "transcribe"
+
+    async def _run_devanagari() -> None:
+        session = CallSession("sess-devanagari")
+        await session.start()
+
+        # Devanagari output from Gnani Prisma with ITN digits + Hindi 'ओवर'
+        t1 = await session.receive_stt_chunk(
+            "रामपुर पुरानी बस्ती से पूजा देवी पत्नी रमेश कुमार 32 हफ्ते बीपी 150 बाई 95 है और तेज सर दर्द है ओवर"
+        )
+        assert t1 is not None
+        assert t1.patient.full_name == "Pooja Devi"
+        assert t1.patient.spouse_or_guardian_name == "Ramesh Kumar"
+        assert t1.patient.village == "Rampur"
+        assert t1.patient.tola == "Purani Basti"
+        assert t1.visit_values.gestational_weeks == 32
+        assert t1.visit_values.bp_systolic == 150
+        assert t1.visit_values.bp_diastolic == 95
+        assert SymptomCode.SEVERE_HEADACHE in t1.visit_values.present_symptoms
+        assert t1.triage_result.level is TriageLevel.CRITICAL
+        assert "R2" in t1.triage_result.rules_fired
+        assert t1.verification is VerificationStatus.UNVERIFIED
+
+        # Devanagari confirmation
+        t2 = await session.receive_stt_chunk("हाँ बिल्कुल सही है ओवर")
+        assert t2 is not None
+        assert t2.is_confirmation_turn is True
+        assert t2.verification is VerificationStatus.VERIFIED
+
+    asyncio.run(_run_devanagari())
+
+
+def test_step_by_step_full_checklist_flow(monkeypatch) -> None:
+    """Verify live interactive calls ask for Patient Name -> Spouse Name -> Weeks -> BP -> Hb -> Confirmation."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    async def _run_checklist() -> None:
+        runner = LangGraphTurnRunner(require_full_checklist=True)
+        session = CallSession("sess-checklist", turn_runner=runner)
+        await session.start()
+
+        # Turn 1: ASHA gives village + patient name ("Main Rampur mein Sunita Devi ke ghar hoon")
+        t1 = await session.process_utterance("Main Rampur mein Sunita Devi ke ghar hoon")
+        assert t1 is not None
+        assert t1.patient.full_name == "Sunita Devi"
+        assert t1.patient.village == "Rampur"
+        assert t1.next_action == "ASK_SPOUSE_NAME"
+        assert "pati (husband) ka naam" in t1.reply_text
+
+        # Turn 2: ASHA gives bare husband name ("Rakesh Kumar") -> saved as spouse, preserves patient name
+        t2 = await session.process_utterance("Rakesh Kumar")
+        assert t2 is not None
+        assert t2.patient.full_name == "Sunita Devi"
+        assert t2.patient.spouse_or_guardian_name == "Rakesh Kumar"
+        assert t2.next_action == "ASK_WEEKS"
+        assert "kitne hafte (weeks)" in t2.reply_text
+
+        # Turn 3: ASHA gives weeks ("28") -> asks for BP
+        t3 = await session.process_utterance("28")
+        assert t3 is not None
+        assert t3.visit_values.gestational_weeks == 28
+        assert t3.next_action == "ASK_BP"
+        assert "BP (blood pressure)" in t3.reply_text
+
+        # Turn 4: ASHA gives elevated BP ("BP 150 by 95") -> still asks for Hemoglobin & symptoms!
+        t4 = await session.process_utterance("BP 150 by 95")
+        assert t4 is not None
+        assert t4.visit_values.bp_systolic == 150
+        assert t4.visit_values.bp_diastolic == 95
+        assert t4.next_action == "ASK_HB"
+        assert "Hemoglobin (Hb)" in t4.reply_text
+
+        # Turn 5: ASHA gives Hb + symptom -> full readback confirmation with all fields
+        t5 = await session.process_utterance("Hb 9 point 5 hai aur tez sar dard hai")
+        assert t5 is not None
+        assert t5.visit_values.hb_g_dl == 9.5
+        assert t5.next_action == "CONFIRM_VALUES"
+        assert "Sunita Devi W/o Rakesh Kumar" in t5.reply_text
+        assert "28 hafte" in t5.reply_text
+        assert "BP 150 by 95" in t5.reply_text
+        assert "Hemoglobin 9.5 g/dL" in t5.reply_text
+        assert t5.verification is VerificationStatus.UNVERIFIED
+
+        # Turn 6: ASHA confirms readback -> flips to VERIFIED
+        t6 = await session.process_utterance("Haan sahi hai")
+        assert t6 is not None
+        assert t6.is_confirmation_turn is True
+        assert t6.verification is VerificationStatus.VERIFIED
+        assert t6.next_action == "COMMITTED_VERIFIED"
+
+    asyncio.run(_run_checklist())
+
+
 

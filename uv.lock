@@ -52,6 +52,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "gnani-vachana" },
     { name = "langchain-groq" },
     { name = "langgraph" },
     { name = "pydantic-settings" },
@@ -67,6 +68,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.162.0" },
+    { name = "gnani-vachana", specifier = ">=0.9.0" },
     { name = "langchain-groq", specifier = ">=1.1.3" },
     { name = "langgraph", specifier = ">=1.2.18" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
@@ -567,6 +569,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/51/45/72c2bf5ae3386407009fe51c40e548e41f70181bbe34a6477bb6078be047/fastar-0.12.0-cp315-cp315t-win32.whl", hash = "sha256:39dad3351f1399cd28e2e649b6651299ef857df6c745e598b00b4167dcf93dbc", size = 449932, upload-time = "2026-08-20T09:12:10.589Z" },
     { url = "https://files.pythonhosted.org/packages/7f/74/0adeb47b838c62ebd78bdf11ee2255e6e205ea176f9147978efa022ef855/fastar-0.12.0-cp315-cp315t-win_amd64.whl", hash = "sha256:00cda9a3f11871261a4e77a3b8f0eede85c9730fb7516811bcbcf96a2bb3b75b", size = 482858, upload-time = "2026-08-20T09:11:53.714Z" },
     { url = "https://files.pythonhosted.org/packages/bf/b9/b2ce5a79c57150d36aa8e0514dd65999ea76f091242aba93c403cd20e491/fastar-0.12.0-cp315-cp315t-win_arm64.whl", hash = "sha256:e8e0fb057b5c271f46f3300b539b0d3dab8c8cb2515205a37c818c2f68d16806", size = 458287, upload-time = "2026-08-20T09:11:36.952Z" },
+]
+
+[[package]]
+name = "gnani-vachana"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/1e/2d63179b47512aedc68527bff68b0ea92cd8ffac973bf060d87fb6323f31/gnani_vachana-0.9.0.tar.gz", hash = "sha256:17e71544c9964393694fb925fde09f0ed24455fe6ead884558c880fcff64ff63", size = 51463, upload-time = "2026-10-27T13:53:09.186Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/7d/1b5e65d0c9315a848626f6eb824536a5fec3676d6389edebc391503f0c9f/gnani_vachana-0.9.0-py3-none-any.whl", hash = "sha256:21b290cfd5a7a8cb9772e74759b77c2d76da9ece1f9345979bd957e3c801cce0", size = 49680, upload-time = "2026-10-27T13:53:07.809Z" },
 ]
 
 [[package]]
