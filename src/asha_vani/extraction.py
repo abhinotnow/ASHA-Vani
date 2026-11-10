@@ -26,10 +26,20 @@ SYSTEM_PROMPT = """Extract only facts explicitly stated in the ASHA worker's utt
 The utterance may be Hindi, Hinglish, Devanagari, or code-switched.
 Never infer missing measurements, diagnoses, risk levels, or medical advice.
 Return patient details and visit values using the supplied schema.
+IMPORTANT: Always transliterate patient.full_name, patient.spouse_or_guardian_name,
+patient.village, and patient.tola into English Roman script in Title Case
+(for example, 'सुनीता देवी' -> 'Sunita Devi', 'अभिनव प्रणव राज' -> 'Abhinav Pranav Raj',
+'रामपुर' -> 'Rampur'). Never return Devanagari script in patient fields.
 Normalize spoken numbers only when clear (for example, 'dedh sau by pachhanave'
-means BP 150/95). Extract gestational weeks only when weeks are stated; do not
-convert months. Map only symptoms in the schema, marking PRESENT or ABSENT only
-when explicitly reported/denied; use UNKNOWN when mentioned but unclear.
+means BP 150/95). Extract gestational weeks only when positive weeks are stated;
+if the speaker says 0 weeks, 0 hafte, 0, or that the patient is not pregnant,
+leave gestational_weeks as null. Do not convert months.
+When the previous prompt/action is ASK_SPOUSE_NAME, or when the speaker is stating
+or correcting the husband's name ('pati ka naam ...'), put the name ONLY in
+patient.spouse_or_guardian_name and leave patient.full_name as null.
+Map symptoms in the schema, including stomach/upper abdominal pain ('pet dard',
+'pet mein dard', 'pet ke upar dard', 'stomach pain') as EPIGASTRIC_PAIN, marking
+PRESENT or ABSENT only when explicitly reported/denied; use UNKNOWN when unclear.
 Set confirmation_intent to YES or NO when answering a previous readback or a
 yes/no question such as whether another patient should be recorded. If the
 previous action asked for a bare answer, interpret it in that context.
@@ -48,23 +58,178 @@ _NUMBER_PHRASES: tuple[tuple[str, str], ...] = (
     ("battis", "32"), ("बत्तीस", "32"), ("atthais", "28"),
     ("chhabbis", "26"), ("chaubis", "24"), ("tees", "30"),
     ("bees", "20"), ("sau", "100"),
+    ("shunya", "0"), ("शून्य", "0"), ("zero", "0"),
 )
 
 _SYMPTOM_TERMS: dict[SymptomCode, tuple[str, ...]] = {
-    SymptomCode.SEVERE_HEADACHE: ("severe headache", "headache", "sar dard", "sir dard", "तेज सर दर्द", "सर दर्द", "सिर दर्द"),
-    SymptomCode.BLURRED_VISION: ("blurred vision", "dhundhla", "दिखाई धुंधला", "धुंधला दिख"),
-    SymptomCode.EPIGASTRIC_PAIN: ("epigastric", "upper abdominal pain", "pet ke upar dard", "पेट के ऊपर दर्द"),
-    SymptomCode.CONVULSION: ("convulsion", "seizure", "fits", "daura", "jhatke", "दौरा", "झटके"),
-    SymptomCode.UNCONSCIOUS: ("unconscious", "behosh", "बेहोश"),
-    SymptomCode.VAGINAL_BLEEDING: ("vaginal bleeding", "bleeding", "raktstrav", "खून आना", "रक्तस्राव", "ब्लीडिंग"),
-    SymptomCode.LABOUR_PAINS: ("labour pain", "labor pain", "prasav peeda", "प्रसव पीड़ा"),
-    SymptomCode.LEAKING_FLUID: ("leaking fluid", "water broke", "paani nikal", "पानी निकल", "पानी टूट"),
-    SymptomCode.REDUCED_FETAL_MOVEMENT: ("reduced fetal movement", "fetal movement kam", "halchal kam", "हलचल कम"),
-    SymptomCode.SWELLING: ("swelling", "soojan", "sujan", "सूजन"),
+    SymptomCode.SEVERE_HEADACHE: (
+        "severe headache", "headache", "tez sar dard", "tez sir dard",
+        "sar dard", "sir dard", "sar mein dard", "sir mein dard",
+        "तेज सर दर्द", "तेज सिर दर्द", "सर दर्द", "सिर दर्द", "सिर में दर्द",
+    ),
+    SymptomCode.BLURRED_VISION: (
+        "blurred vision", "blurry vision", "dhundhla", "dhundla",
+        "ankhon ke aage andhera", "दिखाई धुंधला", "धुंधला दिख", "धुंधला",
+    ),
+    SymptomCode.EPIGASTRIC_PAIN: (
+        "epigastric", "upper abdominal pain", "abdominal pain",
+        "stomach pain", "stomach ache", "stomachache",
+        "pet ke upar dard", "pet mein dard", "pet me dard", "pet dard",
+        "kaleje mein dard", "पेट के ऊपर दर्द", "पेट में दर्द", "पेट दर्द",
+    ),
+    SymptomCode.CONVULSION: (
+        "convulsion", "seizure", "fits", "daura", "jhatke", "chamki",
+        "दौरा", "झटके", "चमकी",
+    ),
+    SymptomCode.UNCONSCIOUS: (
+        "unconscious", "behosh", "hosh nahi", "बेहोश", "होश नहीं",
+    ),
+    SymptomCode.VAGINAL_BLEEDING: (
+        "vaginal bleeding", "bleeding", "heavy bleeding", "raktstrav",
+        "khoon aana", "khoon behna", "खून आना", "रक्तस्राव", "ब्लीडिंग",
+    ),
+    SymptomCode.LABOUR_PAINS: (
+        "labour pain", "labor pain", "prasav peeda", "prasav dard",
+        "dard shuru", "प्रसव पीड़ा", "प्रसव दर्द",
+    ),
+    SymptomCode.LEAKING_FLUID: (
+        "leaking fluid", "water broke", "paani nikal", "paani aana",
+        "paani toot", "पानी निकल", "पानी आना", "पानी टूट",
+    ),
+    SymptomCode.REDUCED_FETAL_MOVEMENT: (
+        "reduced fetal movement", "fetal movement kam", "halchal kam",
+        "bachche ki halchal kam", "kicks kam", "हलचल कम", "बच्चे की हलचल कम",
+    ),
+    SymptomCode.SWELLING: (
+        "swelling", "edema", "oedema", "soojan", "sujan",
+        "haath pair mein soojan", "muh par soojan", "सूजन",
+    ),
 }
 
 _YES_RE = re.compile(r"\b(haan|han|yes|correct|bilkul sahi|sahi hai|theek hai)\b|हाँ|हां|बिल्कुल सही|सही है|ठीक है", re.I)
 _NO_RE = re.compile(r"\b(no|nahi|nahin|galat|wrong|incorrect)\b|नहीं|गलत", re.I)
+
+_DEVANAGARI_WORD_MAP: dict[str, str] = {
+    "पूजा": "Pooja", "सुनीता": "Sunita", "कविता": "Kavita", "अनीता": "Anita",
+    "सरिता": "Sarita", "गुड्डी": "Guddi", "रिंकी": "Rinki", "मीना": "Meena",
+    "रेखा": "Rekha", "गीता": "Geeta", "सीता": "Sita", "रीता": "Reeta",
+    "राधा": "Radha", "सविता": "Savita", "प्रिया": "Priya", "नेहा": "Neha",
+    "आशा": "Asha", "उषा": "Usha", "किरण": "Kiran", "लता": "Lata",
+    "अभिनव": "Abhinav", "प्रणव": "Pranav", "राज": "Raj", "रमेश": "Ramesh",
+    "राकेश": "Rakesh", "सुरेश": "Suresh", "महेश": "Mahesh", "मुकेश": "Mukesh",
+    "संजय": "Sanjay", "विजय": "Vijay", "अजय": "Ajay", "मनोज": "Manoj",
+    "पप्पू": "Pappu", "राजू": "Raju", "मोहन": "Mohan", "सोहन": "Sohan",
+    "रोहन": "Rohan", "अमित": "Amit", "सुमित": "Sumit", "रोहित": "Rohit",
+    "मोहित": "Mohit", "राहुल": "Rahul", "विकास": "Vikas", "दीपक": "Deepak",
+    "अशोक": "Ashok", "विनोद": "Vinod", "प्रमोद": "Pramod",
+    "देवी": "Devi", "कुमारी": "Kumari", "कुमार": "Kumar", "यादव": "Yadav",
+    "शर्मा": "Sharma", "वर्मा": "Verma", "सिंह": "Singh", "महतो": "Mahto",
+    "लाल": "Lal", "पासवान": "Paswan", "गुप्ता": "Gupta", "पटेल": "Patel",
+    "राम": "Ram", "बाई": "Bai", "बेगम": "Begum", "खातून": "Khatoon",
+    "रामपुर": "Rampur", "बेलवा": "Belwa", "पिपरा": "Pipra", "किशनपुर": "Kishanpur",
+    "माधोपुर": "Madhopur", "पुरानी": "Purani", "नई": "Nayi", "बस्ती": "Basti",
+    "हरिजन": "Harijan", "दक्षिण": "Dakshin", "टोला": "Tola",
+    "पति": "pati", "पत्नी": "patni", "मरीज": "marij", "मरीज़": "marij",
+    "महिला": "mahila", "नाम": "naam", "गलत": "galat", "सही": "sahi",
+    "है": "hai", "हैं": "hain", "का": "ka", "की": "ki", "के": "ke",
+    "से": "se", "में": "mein", "घर": "ghar", "अरे": "are", "सर": "sir",
+    "जी": "ji", "दीदी": "didi", "नहीं": "nahi", "हाँ": "haan", "हां": "haan",
+}
+
+_DEV_VOWELS: dict[str, str] = {
+    "अ": "a", "आ": "aa", "इ": "i", "ई": "ee", "उ": "u", "ऊ": "oo",
+    "ऋ": "ri", "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au",
+}
+_DEV_CONSONANTS: dict[str, str] = {
+    "क": "k", "ख": "kh", "ग": "g", "घ": "gh", "ङ": "n",
+    "च": "ch", "छ": "chh", "ज": "j", "झ": "jh", "ञ": "n",
+    "ट": "t", "ठ": "th", "ड": "d", "ढ": "dh", "ण": "n",
+    "त": "t", "थ": "th", "द": "d", "ध": "dh", "न": "n",
+    "प": "p", "फ": "ph", "ब": "b", "भ": "bh", "म": "m",
+    "य": "y", "र": "r", "ल": "l", "व": "v",
+    "श": "sh", "ष": "sh", "स": "s", "ह": "h",
+    "क़": "q", "ख़": "kh", "ग़": "gh", "ज़": "z", "ड़": "r", "ढ़": "rh", "फ़": "f",
+}
+_DEV_MATRAS: dict[str, str] = {
+    "ा": "a", "ि": "i", "ी": "ee", "ु": "u", "ू": "oo",
+    "ृ": "ri", "े": "e", "ै": "ai", "ो": "o", "ौ": "au",
+}
+_NAME_STOPWORDS = {
+    "didi", "ji", "sir", "are", "arre", "naam", "name", "hai", "hain", "is",
+    "patient", "marij", "patni", "pati", "husband", "wife", "spouse", "guardian",
+    "mahila", "aurat", "ka", "ki", "ke", "se", "mein", "main", "ghar", "hoon",
+    "galat", "sahi", "wrong", "correct", "nahi", "nahin", "no", "yes", "haan",
+    "han", "unke", "unka", "unki", "uska", "uski", "aur", "ya", "theek",
+    "badlo", "change", "dobara", "batao", "batayein", "w/o", "wo",
+}
+
+
+def _transliterate_devanagari_word(word: str) -> str:
+    if word in _DEVANAGARI_WORD_MAP:
+        return _DEVANAGARI_WORD_MAP[word]
+    if not any("\u0900" <= ch <= "\u097f" for ch in word):
+        return word
+    out: list[str] = []
+    n = len(word)
+    i = 0
+    while i < n:
+        ch = word[i]
+        if ch in _DEV_VOWELS:
+            out.append(_DEV_VOWELS[ch])
+            i += 1
+        elif ch in _DEV_CONSONANTS:
+            base = _DEV_CONSONANTS[ch]
+            # Handle nukta combined characters (e.g., ड + ़)
+            if i + 1 < n and word[i + 1] == "़":
+                combined = ch + "़"
+                base = _DEV_CONSONANTS.get(combined, base)
+                i += 1
+            if i + 1 < n and word[i + 1] == "्":
+                out.append(base)
+                i += 2
+            elif i + 1 < n and word[i + 1] in _DEV_MATRAS:
+                out.append(base + _DEV_MATRAS[word[i + 1]])
+                i += 2
+            else:
+                # Word-final schwa deletion in Hindi (e.g. अभिनव -> Abhinav, राज -> Raj)
+                is_word_end = (i == n - 1) or (i == n - 2 and word[i + 1] in ("ं", "ँ"))
+                out.append(base if is_word_end and i > 0 else base + "a")
+                i += 1
+        elif ch in ("ं", "ँ"):
+            out.append("n")
+            i += 1
+        elif ch == "ः":
+            out.append("h")
+            i += 1
+        elif ch in _DEV_MATRAS:
+            out.append(_DEV_MATRAS[ch])
+            i += 1
+        else:
+            i += 1
+    return "".join(out)
+
+
+def transliterate_to_english(text: str) -> str:
+    """Convert any Devanagari words in `text` to Roman English equivalents."""
+    if not text:
+        return ""
+    return re.sub(r"[\u0900-\u097f]+", lambda m: _transliterate_devanagari_word(m.group(0)), text)
+
+
+def _clean_person_name(raw_name: str | None) -> str | None:
+    """Transliterate to English, strip non-name stop words ('galat', 'pati', 'hai', etc.), and Title-Case."""
+    if not raw_name:
+        return None
+    roman = transliterate_to_english(raw_name)
+    tokens = [
+        tok
+        for tok in re.findall(r"[A-Za-z]+", roman)
+        if tok.lower() not in _NAME_STOPWORDS and len(tok) >= 2
+    ]
+    if not tokens:
+        return None
+    cleaned = " ".join(tokens[:4]).title()
+    return cleaned if 2 <= len(cleaned) <= 45 else None
 
 
 class _ModelOutput(ProjectModel):
@@ -90,7 +255,7 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
     if bp:
         visit_data.update(bp_systolic=int(bp.group(1)), bp_diastolic=int(bp.group(2)))
     weeks = re.search(r"(\d{1,2})\s*(?:weeks?|hafte|hafta|saptah|हफ्ते|हफ़्ते|सप्ताह)", normalized)
-    if weeks:
+    if weeks and int(weeks.group(1)) > 0:
         visit_data["gestational_weeks"] = int(weeks.group(1))
     hb = re.search(r"(?:\bhb\b|hemoglobin|haemoglobin|हीमोग्लोबिन|एचबी)\s*(?:hai|is|है)?\s*(\d{1,2}(?:\.\d+)?)", normalized)
     if hb:
@@ -109,32 +274,60 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
             )
             symptoms.append(SymptomReport(code=code, presence=Presence.ABSENT if negated else Presence.PRESENT, phrase=found))
     # A clear general denial records known symptoms as absent, never as present.
-    if not symptoms and re.search(r"\b(no symptoms|koi takleef nahi|koi lakshan nahi)\b|कोई तकलीफ नहीं|कोई लक्षण नहीं", normalized):
+    general_denial = bool(
+        re.search(r"\b(no symptoms|koi takleef nahi|koi lakshan nahi|kuch nahi|koi dikkat nahi)\b|कोई तकलीफ नहीं|कोई लक्षण नहीं|कुछ नहीं", normalized)
+        or (expected_action == "ASK_SYMPTOMS" and _NO_RE.search(transcript) and not _YES_RE.search(transcript))
+    )
+    if not symptoms and general_denial:
         symptoms = [SymptomReport(code=code, presence=Presence.ABSENT) for code in SymptomCode]
     if symptoms:
         visit_data["symptoms"] = symptoms
 
-    name = re.search(r"\b([A-Za-z]+\s+(?:devi|kumari|bai|begum|yadav|verma|sharma|singh|khatoon))\b", transcript, re.I)
-    if name:
-        patient.full_name = name.group(1).title()
-    else:
-        for devanagari_name, latin_name in (
-            ("पूजा देवी", "Pooja Devi"), ("कविता देवी", "Kavita Devi"),
-            ("रिंकी कुमारी", "Rinki Kumari"), ("अनीता देवी", "Anita Devi"),
-            ("सरिता कुमारी", "Sarita Kumari"), ("गुड्डी देवी", "Guddi Devi"),
-        ):
-            if devanagari_name in transcript:
-                patient.full_name = latin_name
-                break
-    spouse = re.search(r"(?:patni|pati(?: ka naam)?|husband(?: name)?|spouse|w/o|wife of|guardian)\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+)?)", transcript, re.I)
-    if spouse:
-        candidate = re.sub(r"\b(hai|aur|age|weeks?|hafte|bp)\b.*$", "", spouse.group(1), flags=re.I).strip()
-        if candidate:
-            patient.spouse_or_guardian_name = candidate.title()
-    elif "रमेश कुमार" in transcript:
-        patient.spouse_or_guardian_name = "Ramesh Kumar"
+    roman_transcript = transliterate_to_english(transcript)
+    transcript_for_patient = roman_transcript
+
+    # Extract explicit spouse/husband name clauses (skipping clauses like 'pati ka naam galat hai')
+    _name_stop_lookahead = (
+        r"(?=\s+(?:\d|\b(?:hai|hain|aur|age|umra|weeks?|hafte|hafta|saptah|bp|hb|hemoglobin|gaon|tola|pati|patni|marij|patient)\b)|[.,;!?]|$)"
+    )
+    for spouse_match in re.finditer(
+        r"\b(?:patni|pati(?:\s+ka\s+naam)?|husband(?:\s+name)?|spouse|w/o|wife\s+of|guardian)\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){0,4}?)"
+        + _name_stop_lookahead,
+        roman_transcript,
+        re.I,
+    ):
+        cleaned_spouse = _clean_person_name(spouse_match.group(1))
+        if cleaned_spouse:
+            patient.spouse_or_guardian_name = cleaned_spouse
+            transcript_for_patient = transcript_for_patient.replace(spouse_match.group(0), " ")
+
+    # Extract explicit patient/wife name clauses (e.g. 'marij ka naam Sunita Devi hai')
+    for pat_match in re.finditer(
+        r"\b(?:marij(?:\s+ka\s+naam)?|patient(?:\s+name|\s+ka\s+naam)?|mahila(?:\s+ka\s+naam)?|aurat(?:\s+ka\s+naam)?)\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){0,4}?)"
+        + _name_stop_lookahead,
+        transcript_for_patient,
+        re.I,
+    ):
+        cleaned_pat = _clean_person_name(pat_match.group(1))
+        if cleaned_pat:
+            patient.full_name = cleaned_pat
+
+    mentions_patient_keyword = bool(re.search(r"\b(marij|patient|mahila|aurat)\b", roman_transcript, re.I))
+    is_spouse_only_turn = expected_action == "ASK_SPOUSE_NAME" and not mentions_patient_keyword
+
+    if not is_spouse_only_turn and patient.full_name is None:
+        name = re.search(
+            r"\b([A-Za-z]+\s+(?:devi|kumari|bai|begum|yadav|verma|sharma|singh|khatoon))\b",
+            transcript_for_patient,
+            re.I,
+        )
+        if name:
+            cleaned_pat = _clean_person_name(name.group(1))
+            if cleaned_pat and cleaned_pat != patient.spouse_or_guardian_name:
+                patient.full_name = cleaned_pat
+
     for token, canonical in (("rampur", "Rampur"), ("रामपुर", "Rampur"), ("belwa", "Belwa"), ("बेलवा", "Belwa")):
-        if token in normalized:
+        if token in normalized or token in roman_transcript.lower():
             patient.village = canonical
             break
     for token, canonical in (
@@ -142,7 +335,7 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
         ("nayi basti", "Nayi Basti"), ("नई बस्ती", "Nayi Basti"),
         ("harijan tola", "Harijan Tola"), ("dakshin tola", "Dakshin Tola"),
     ):
-        if token in normalized:
+        if token in normalized or token in roman_transcript.lower():
             patient.tola = canonical
             break
     age = re.search(r"\b(?:age|umra)\s*(\d{2})\b|\b(\d{2})\s*(?:saal|years|साल)\b", normalized)
@@ -150,18 +343,16 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
         patient.age_years = int(age.group(1) or age.group(2))
 
     if expected_action == "ASK_PATIENT_NAME" and patient.full_name is None and not visit_data:
-        candidate = re.sub(r"\b(?:didi|naam|hai|patient|marij|ji)\b", " ", transcript, flags=re.I)
-        candidate = " ".join(candidate.split()).strip(" ,.!?")
-        if 2 <= len(candidate) <= 40 and not any(char.isdigit() for char in candidate):
-            patient.full_name = candidate.title()
+        cleaned_pat = _clean_person_name(transcript_for_patient)
+        if cleaned_pat:
+            patient.full_name = cleaned_pat
     if expected_action == "ASK_SPOUSE_NAME" and patient.spouse_or_guardian_name is None and not visit_data:
-        candidate = re.sub(r"\b(?:pati|husband|naam|hai|ji|didi|unke)\b", " ", transcript, flags=re.I)
-        candidate = " ".join(candidate.split()).strip(" ,.!?")
-        if 2 <= len(candidate) <= 40 and not any(char.isdigit() for char in candidate):
-            patient.spouse_or_guardian_name = candidate.title()
+        cleaned_spouse = _clean_person_name(roman_transcript)
+        if cleaned_spouse:
+            patient.spouse_or_guardian_name = cleaned_spouse
     if expected_action == "ASK_WEEKS" and "gestational_weeks" not in visit_data:
         bare = re.search(r"\b(\d{1,2})\b", normalized)
-        if bare:
+        if bare and int(bare.group(1)) > 0:
             visit_data["gestational_weeks"] = int(bare.group(1))
     if expected_action == "ASK_HB" and "hb_g_dl" not in visit_data:
         bare = re.search(r"\b(\d{1,2}(?:\.\d+)?)\b", normalized)
@@ -225,8 +416,22 @@ async def extract_turn(
         try:
             result = await model.ainvoke(messages)
             parsed = result if isinstance(result, _ModelOutput) else _ModelOutput.model_validate(result)
+            roman_utt = transliterate_to_english(transcript)
+            mentions_spouse = bool(re.search(r"\b(pati|husband|spouse)\b", roman_utt, re.I))
+            mentions_patient = bool(re.search(r"\b(marij|patient|mahila|aurat)\b", roman_utt, re.I))
+            if expected_action == "ASK_SPOUSE_NAME" and not mentions_patient:
+                if parsed.patient.full_name and not parsed.patient.spouse_or_guardian_name:
+                    parsed.patient.spouse_or_guardian_name = parsed.patient.full_name
+                parsed.patient.full_name = None
+            elif mentions_spouse and not mentions_patient and not fallback.patient.full_name:
+                if parsed.patient.full_name and not parsed.patient.spouse_or_guardian_name:
+                    parsed.patient.spouse_or_guardian_name = parsed.patient.full_name
+                parsed.patient.full_name = None
+            if parsed.visit.gestational_weeks == 0:
+                parsed.visit.gestational_weeks = None
+            merged_patient = _merge_patient(parsed.patient, fallback.patient)
             return TurnExtraction(
-                patient=_merge_patient(parsed.patient, fallback.patient),
+                patient=merged_patient,
                 visit=_merge_visit(parsed.visit, fallback.visit),
                 confirmation_intent=(
                     parsed.confirmation_intent
@@ -244,6 +449,14 @@ def _merge_patient(primary: PatientReference, fallback: PatientReference) -> Pat
     for key, value in fallback.model_dump().items():
         if values.get(key) is None and value is not None:
             values[key] = value
+    if values.get("full_name"):
+        values["full_name"] = _clean_person_name(values["full_name"])
+    if values.get("spouse_or_guardian_name"):
+        values["spouse_or_guardian_name"] = _clean_person_name(values["spouse_or_guardian_name"])
+    if values.get("village"):
+        values["village"] = transliterate_to_english(values["village"]).strip().title()
+    if values.get("tola"):
+        values["tola"] = transliterate_to_english(values["tola"]).strip().title()
     return PatientReference.model_validate(values)
 
 

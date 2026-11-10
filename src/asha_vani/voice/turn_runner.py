@@ -70,7 +70,10 @@ _ASHA_ROSTER: dict[str, tuple[str, str]] = {
 }
 
 _NON_PREGNANT_PATTERNS = re.compile(
-    r"(?:\b(?:pregnant\s+nahi|garbhvati\s+nahi|not\s+pregnant|no\s+pregnancy|postnatal|post\s+natal|pnc|delivery\s+ho\s+gayi|general\s+checkup|normal\s+checkup|bukhar\s+checkup)\b|गर्भवती\s+नहीं)",
+    r"(?:\b(?:pregnant\s+nahi|garbhvati\s+nahi|garbhini\s+nahi|not\s+pregnant|no\s+pregnancy|"
+    r"postnatal|post\s+natal|pnc|delivery\s+ho\s+gayi|general\s+checkup|normal\s+checkup|bukhar\s+checkup|"
+    r"0\s*(?:weeks?|hafte|hafta|saptah)|zero\s*(?:weeks?|hafte|hafta|saptah)|shunya\s*(?:weeks?|hafte|hafta|saptah))\b|"
+    r"गर्भवती\s+नहीं|0\s*(?:हफ्ते|हफ़्ते|सप्ताह)|शून्य\s*(?:हफ्ते|हफ़्ते|सप्ताह))",
     re.IGNORECASE,
 )
 
@@ -99,10 +102,14 @@ def extract_asha_worker_id(transcript: str, *, expected_action: str | None = Non
     return None, None
 
 
-def detect_non_pregnant_category(transcript: str) -> tuple[bool | None, str | None]:
+def detect_non_pregnant_category(transcript: str, *, expected_action: str | None = None) -> tuple[bool | None, str | None]:
     """Detect if the speaker explicitly indicates a non-pregnant / postnatal / general checkup."""
-    low = transcript.lower()
-    if _NON_PREGNANT_PATTERNS.search(low) or re.match(r"^\s*0\s*#?\s*$", low):
+    low = transcript.lower().strip()
+    is_weeks_zero_or_no = bool(
+        expected_action == "ASK_WEEKS"
+        and re.match(r"^\s*(?:0|zero|shunya|nahi|nahin|no)\b|^\s*(?:नहीं|शून्य)\b", low, re.IGNORECASE)
+    )
+    if _NON_PREGNANT_PATTERNS.search(low) or re.match(r"^\s*0\s*#?\s*$", low) or is_weeks_zero_or_no:
         if any(w in low for w in ("postnatal", "post natal", "pnc", "delivery")):
             return False, "POSTNATAL_PNC"
         if any(w in low for w in ("bukhar", "fever", "infection")):
@@ -138,7 +145,7 @@ def _build_english_summary(
     if asha_id:
         parts.append(f"Worker: {asha_id}")
     if patient.full_name:
-        sp = f" (W/o {patient.spouse_or_guardian_name})" if patient.spouse_or_guardian_name else ""
+        sp = f" (Husband: {patient.spouse_or_guardian_name})" if patient.spouse_or_guardian_name else ""
         vil = f", {patient.village}" if patient.village else ""
         parts.append(f"Patient: {patient.full_name}{sp}{vil}")
     if is_pregnant is False:
@@ -188,8 +195,8 @@ class LangGraphTurnRunner:
             self._asha_workers[session_id] = (found_id, found_name)
         asha_id, asha_name = self._asha_workers.get(session_id, (None, None))
 
-        # 2. Detect Non-Pregnant category ("pregnant nahi hai", "postnatal", etc.)
-        np_flag, np_cat = detect_non_pregnant_category(transcript)
+        # 2. Detect Non-Pregnant category ("pregnant nahi hai", "0 weeks", "postnatal", etc.)
+        np_flag, np_cat = detect_non_pregnant_category(transcript, expected_action=expected_action)
         cur_preg, cur_cat = self._pregnancy_state.get(session_id, (None, "MATERNAL_ANC"))
         if np_flag is False and np_cat:
             cur_preg = False
@@ -209,9 +216,12 @@ class LangGraphTurnRunner:
         )
 
         graph_utterance = "" if is_pure_asha_id_turn else _normalize_dtmf_for_graph(transcript, expected_action)
+        invoke_payload: dict[str, Any] = {"utterance": graph_utterance}
+        if cur_preg is False:
+            invoke_payload["is_pregnant"] = False
 
         state = await self._graph.ainvoke(
-            {"utterance": graph_utterance},
+            invoke_payload,
             config={"configurable": {"thread_id": session_id}},
         )
 
@@ -226,46 +236,23 @@ class LangGraphTurnRunner:
         triage_summary = str(state.get("triage_summary", ""))
         is_confirmation_turn = bool(state.get("is_confirmation_turn", False))
 
-        if visit_values.gestational_weeks is not None and cur_preg is None:
+        if state.get("is_pregnant") is False:
+            cur_preg = False
+            if cur_cat == "MATERNAL_ANC":
+                cur_cat = "GENERAL_VITALS"
+            self._pregnancy_state[session_id] = (cur_preg, cur_cat)
+        elif visit_values.gestational_weeks is not None and visit_values.gestational_weeks > 0:
             cur_preg = True
+            cur_cat = "MATERNAL_ANC"
+            self._pregnancy_state[session_id] = (cur_preg, cur_cat)
+        elif next_action == "ASK_PATIENT_NAME" and int(state.get("visit_number", 1)) > 1:
+            cur_preg = None
             cur_cat = "MATERNAL_ANC"
             self._pregnancy_state[session_id] = (cur_preg, cur_cat)
 
         if is_pure_asha_id_turn and asha_name and asha_id and next_action == "ASK_PATIENT_NAME":
             short_name = asha_name.split("(")[0].strip()
             reply_text = f"Ji {short_name} Didi ({asha_id}), marij (patient) ka poora naam aur gaon batayein."
-
-        if self.require_full_checklist and cur_preg is False and next_action == "ASK_WEEKS":
-            if visit_values.bp_systolic is None or visit_values.bp_diastolic is None:
-                next_action = "ASK_BP"
-                reply_text = (
-                    "Ji Didi, Non-Pregnant checkup note ho gaya. "
-                    "Unka BP (blood pressure) kitna aaya hai? Systolic aur diastolic dono number batayein."
-                )
-            elif visit_values.hb_g_dl is None:
-                next_action = "ASK_HB"
-                reply_text = (
-                    f"BP {visit_values.bp_systolic} by {visit_values.bp_diastolic} note kar liya. "
-                    "Unka Hemoglobin (Hb) kitna aaya hai, aur koi takleef ya lakshan hai kya?"
-                )
-            else:
-                next_action = "CONFIRM_VALUES"
-                details = []
-                if patient.full_name:
-                    sp = f" W/o {patient.spouse_or_guardian_name}" if patient.spouse_or_guardian_name else ""
-                    details.append(f"{patient.full_name}{sp}")
-                details.append("Non-Pregnant Checkup")
-                details.append(f"BP {visit_values.bp_systolic} by {visit_values.bp_diastolic}")
-                details.append(f"Hemoglobin {visit_values.hb_g_dl:g} g/dL")
-                rules = ", ".join(triage_result.rules_fired) or "koi danger rule trigger nahi hua"
-                reply_text = (
-                    f"Didi, confirm karein: {', '.join(details)}. Screening {triage_result.level.value} hai, "
-                    f"{rules}. Kya yeh jaankari sahi hai? Yeh diagnosis nahi hai."
-                )
-            await self._graph.aupdate_state(
-                {"configurable": {"thread_id": session_id}},
-                {"next_action": next_action, "reply_text": reply_text},
-            )
 
         self._last_action[session_id] = next_action
         eng_summary = _build_english_summary(

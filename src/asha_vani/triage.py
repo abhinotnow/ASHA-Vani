@@ -53,22 +53,30 @@ def evaluate_triage(visit: ExtractedVisit) -> TriageResult:
     ):
         fired.append(("R1", TriageLevel.CRITICAL))
 
-    # R2: elevated blood pressure with a severe feature.
+    # R2: elevated blood pressure with a severe feature is CRITICAL;
+    # standalone severe symptoms (epigastric/stomach pain, severe headache, blurred vision) are URGENT.
     if bp_at_least_140_90 and symptoms & _SEVERE_BP_SYMPTOMS:
         fired.append(("R2", TriageLevel.CRITICAL))
+    elif not bp_at_least_140_90 and (
+        symptoms & {SymptomCode.EPIGASTRIC_PAIN, SymptomCode.SEVERE_HEADACHE, SymptomCode.BLURRED_VISION}
+    ):
+        fired.append(("R2", TriageLevel.URGENT))
 
     # R3: elevated blood pressure without a severe feature; swelling alone
     # does not count as a severe feature.
     if bp_at_least_140_90 and not (symptoms & _SEVERE_BP_SYMPTOMS):
         fired.append(("R3", TriageLevel.URGENT))
 
-    # R4: vaginal bleeding at or beyond 20 gestational weeks.
+    # R4: vaginal bleeding at or beyond 20 gestational weeks is CRITICAL;
+    # vaginal bleeding in a non-pregnant / unknown-gestation checkup is URGENT.
     if (
         weeks is not None
         and weeks >= 20
         and SymptomCode.VAGINAL_BLEEDING in symptoms
     ):
         fired.append(("R4", TriageLevel.CRITICAL))
+    elif weeks is None and SymptomCode.VAGINAL_BLEEDING in symptoms:
+        fired.append(("R4", TriageLevel.URGENT))
 
     # R5a/R5b: anemia screening thresholds. Both can fire below 5; the
     # highest level wins while preserving both rule IDs for the case record.

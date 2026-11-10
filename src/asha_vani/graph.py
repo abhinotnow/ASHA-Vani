@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Literal, TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from asha_vani.extraction import extract_turn
+from asha_vani.extraction import extract_turn, transliterate_to_english
 from asha_vani.schemas import (
     ConfirmationIntent,
     ExtractedVisit,
@@ -42,6 +43,8 @@ class CallState(TypedDict, total=False):
     reply_text: str
     triage_summary: str
     verification: Literal["UNVERIFIED", "VERIFIED", "INCOMPLETE"]
+    is_pregnant: bool | None
+    correction_target: str | None
     symptoms_collected: bool
     is_confirmation_turn: bool
     visit_number: int
@@ -53,16 +56,36 @@ class CallState(TypedDict, total=False):
     history_candidate_index: int
     patient_match_status: Literal["EXISTING", "NEW", "UNAVAILABLE"]
     matched_patient_id: str | None
+    changed_readback: list[str]
 
 
 _NUMERIC_FIELDS = ("gestational_weeks", "bp_systolic", "bp_diastolic", "hb_g_dl")
+_NON_PREGNANT_RE = re.compile(
+    r"(?:\b(?:pregnant\s+nahi|garbhvati\s+nahi|garbhini\s+nahi|not\s+pregnant|no\s+pregnancy|"
+    r"postnatal|post\s+natal|pnc|delivery\s+ho\s+gayi|general\s+checkup|normal\s+checkup|"
+    r"0\s*(?:weeks?|hafte|hafta|saptah)|zero\s*(?:weeks?|hafte|hafta|saptah)|shunya\s*(?:weeks?|hafte|hafta|saptah))\b|"
+    r"गर्भवती\s+नहीं|0\s*(?:हफ्ते|हफ़्ते|सप्ताह)|शून्य\s*(?:हफ्ते|हफ़्ते|सप्ताह))",
+    re.IGNORECASE,
+)
+_SYMPTOM_HINDI_LABELS: dict[SymptomCode, str] = {
+    SymptomCode.SEVERE_HEADACHE: "tez sar dard",
+    SymptomCode.BLURRED_VISION: "dhundhla dikhna",
+    SymptomCode.EPIGASTRIC_PAIN: "pet mein dard",
+    SymptomCode.CONVULSION: "daura",
+    SymptomCode.UNCONSCIOUS: "behoshi",
+    SymptomCode.VAGINAL_BLEEDING: "bleeding",
+    SymptomCode.LABOUR_PAINS: "prasav dard",
+    SymptomCode.LEAKING_FLUID: "paani aana",
+    SymptomCode.REDUCED_FETAL_MOVEMENT: "bachche ki halchal kam",
+    SymptomCode.SWELLING: "soojan",
+}
 _ACTION_PROMPTS = {
     "ASK_PATIENT_NAME": "Didi, marij (patient) ka poora naam aur gaon batayein.",
     "ASK_SPOUSE_NAME": "Ji Didi, pati (husband) ka naam kya hai?",
-    "ASK_WEEKS": "Theek hai. Unke pregnancy ke kitne hafte (weeks) hue hain?",
+    "ASK_WEEKS": "Theek hai. Unke pregnancy ke kitne hafte (weeks) hue hain? Agar garbhvati nahi hain toh zero batayein.",
     "ASK_BP": "Ji, unka BP (blood pressure) kitna aaya hai? Systolic aur diastolic dono number batayein.",
     "ASK_HB": "Unka Hemoglobin (Hb) kitna aaya hai, aur koi takleef ya lakshan hai kya?",
-    "ASK_SYMPTOMS": "Kya unhe tez sar dard, dhundhla dikhna, pet ke upar dard, bleeding, daura, paani aana, prasav dard, ya bachche ki halchal kam lagna hai?",
+    "ASK_SYMPTOMS": "Kya unhe pet mein dard, tez sar dard, dhundhla dikhna, bleeding, daura, soojan, paani aana, ya bachche ki halchal kam lagna hai?",
 }
 
 
@@ -90,10 +113,10 @@ def route_after_extract(state: CallState) -> Literal[
             return "skip_history"
         return "history_repeat"
     if previous_action == "ASK_ANOTHER_PATIENT":
-        if intent is ConfirmationIntent.YES:
-            return "new_visit"
         if intent is ConfirmationIntent.NO:
             return "finish_call"
+        if intent is ConfirmationIntent.YES or has_new_facts:
+            return "new_visit"
         return "continue_prompt"
     if previous_action == "CONFIRM_VALUES" and not has_new_facts:
         if intent is ConfirmationIntent.YES:
@@ -108,13 +131,12 @@ def confirm_node(state: CallState) -> dict[str, Any]:
     patient = PatientReference.model_validate(state.get("patient", {}))
     label = patient.full_name or "patient"
     if triage.level is TriageLevel.ROUTINE:
-        reply = f"Dhanyavaad Didi. {label} ka record confirm ho gaya hai. Kya aap kisi aur garbhavati mahila ka record dena chahti hain?"
+        reply = f"Dhanyavaad Didi. {label} ka record confirm ho gaya hai. Kya aap kisi aur mahila ka record dena chahti hain?"
     else:
         reply = (
             f"Dhanyavaad Didi. {label} ka record confirm ho gaya hai. "
-            f"Screening {triage.level.value} hai (rules {', '.join(triage.rules_fired)}). "
-            "PHC team se turant sampark karein. Yeh screening support hai, diagnosis nahi. "
-            "Kya aap kisi aur garbhavati mahila ka record dena chahti hain?"
+            f"Screening {triage.level.value} hai, kripya PHC team se turant sampark karein. "
+            "Kya aap kisi aur mahila ka record dena chahti hain?"
         )
     return {
         "verification": "VERIFIED",
@@ -143,6 +165,7 @@ def start_next_visit_node(state: CallState) -> dict[str, Any]:
         "visit_values": extraction.visit.model_dump(mode="json"),
         "validation_result": validate_visit(ExtractedVisit()).model_dump(mode="json"),
         "triage_result": TriageResult(level=TriageLevel.ROUTINE).model_dump(mode="json"),
+        "is_pregnant": None,
         "symptoms_collected": False,
         "verification": "UNVERIFIED",
         "history_checked": False,
@@ -261,11 +284,30 @@ def history_repeat_node(_: CallState) -> dict[str, str]:
     }
 
 
-def correct_node(_: CallState) -> dict[str, Any]:
+def correct_node(state: CallState) -> dict[str, Any]:
+    roman_utt = transliterate_to_english(state.get("utterance", "")).lower()
+    target: str | None = None
+    reply = "Theek hai Didi. Kaunsi jaankari galat hai? Sahi value dobara batayein."
+    if re.search(r"\b(pati|husband|spouse)\b", roman_utt):
+        target = "ASK_SPOUSE_NAME"
+        reply = "Theek hai Didi. Pati ka sahi naam batayein."
+    elif re.search(r"\b(marij|patient|patni|mahila|aurat|naam)\b", roman_utt):
+        target = "ASK_PATIENT_NAME"
+        reply = "Theek hai Didi. Marij ka sahi naam batayein."
+    elif re.search(r"\b(bp|blood pressure)\b", roman_utt):
+        target = "ASK_BP"
+        reply = "Theek hai Didi. Sahi BP ke dono number batayein."
+    elif re.search(r"\b(hafte|hafta|weeks?)\b", roman_utt):
+        target = "ASK_WEEKS"
+        reply = "Theek hai Didi. Pregnancy ke sahi hafte batayein."
+    elif re.search(r"\b(hb|hemoglobin|khoon)\b", roman_utt):
+        target = "ASK_HB"
+        reply = "Theek hai Didi. Sahi Hemoglobin (Hb) batayein."
     return {
         "verification": "UNVERIFIED",
         "next_action": "CORRECT_VALUES",
-        "reply_text": "Theek hai Didi. Kaunsi jaankari galat hai? Sahi value dobara batayein.",
+        "correction_target": target,
+        "reply_text": reply,
         "is_confirmation_turn": False,
     }
 
@@ -275,28 +317,90 @@ def merge_turn(state: CallState) -> dict[str, Any]:
     current = ExtractedVisit.model_validate(state.get("visit_values", {}))
     extraction = TurnExtraction.model_validate(state.get("turn_extraction", {}))
     incoming = extraction.visit
+    utterance = state.get("utterance", "")
+    roman_utt = transliterate_to_english(utterance)
+    prev_action = state.get("correction_target") or state.get("next_action")
+    is_pregnant = state.get("is_pregnant")
+
+    non_pregnant_stated = bool(
+        incoming.gestational_weeks == 0
+        or _NON_PREGNANT_RE.search(utterance)
+        or (
+            prev_action == "ASK_WEEKS"
+            and re.search(r"^\s*(?:0|zero|shunya|nahi|nahin|no)\b|^\s*(?:नहीं|शून्य)\b", utterance.strip(), re.I)
+        )
+    )
+    if non_pregnant_stated:
+        is_pregnant = False
+
     merged_data = current.model_dump(mode="python")
     for field in _NUMERIC_FIELDS:
         value = getattr(incoming, field)
+        if field == "gestational_weeks" and (value == 0 or non_pregnant_stated):
+            continue
         if value is not None:
             merged_data[field] = value
+            if field == "gestational_weeks" and value > 0:
+                is_pregnant = True
+    if is_pregnant is False:
+        merged_data["gestational_weeks"] = None
+
     symptom_map = {report.code: report for report in current.symptoms}
     for report in incoming.symptoms:
         symptom_map[report.code] = report
     merged_data["symptoms"] = list(symptom_map.values())
 
     current_patient = PatientReference.model_validate(state.get("patient", {})).model_dump()
-    for field, value in extraction.patient.model_dump().items():
+    incoming_patient = extraction.patient.model_dump()
+    mentions_spouse = bool(re.search(r"\b(pati|husband|spouse)\b", roman_utt, re.I))
+    mentions_patient = bool(re.search(r"\b(marij|patient|mahila|aurat)\b", roman_utt, re.I))
+    if (
+        (prev_action == "ASK_SPOUSE_NAME" or (mentions_spouse and not mentions_patient and "patni" not in roman_utt.lower()))
+        and current_patient.get("full_name")
+    ):
+        if incoming_patient.get("full_name") and not incoming_patient.get("spouse_or_guardian_name"):
+            incoming_patient["spouse_or_guardian_name"] = incoming_patient["full_name"]
+        if not mentions_patient:
+            incoming_patient["full_name"] = None
+
+    for field, value in incoming_patient.items():
         if value is not None:
             current_patient[field] = value
 
+    is_correction = state.get("next_action") in {"CONFIRM_VALUES", "CORRECT_VALUES"}
+    changed_readback: list[str] = []
+    if is_correction:
+        if incoming_patient.get("full_name"):
+            changed_readback.append(f"marij ka naam {current_patient['full_name']}")
+        if incoming_patient.get("spouse_or_guardian_name"):
+            changed_readback.append(f"pati ka naam {current_patient['spouse_or_guardian_name']}")
+        if incoming_patient.get("village"):
+            changed_readback.append(f"gaon {current_patient['village']}")
+        if non_pregnant_stated:
+            changed_readback.append("Non-Pregnant Checkup")
+        elif incoming.gestational_weeks is not None and merged_data.get("gestational_weeks") is not None:
+            changed_readback.append(f"{merged_data['gestational_weeks']} hafte")
+        if (incoming.bp_systolic is not None or incoming.bp_diastolic is not None) and (
+            merged_data.get("bp_systolic") is not None and merged_data.get("bp_diastolic") is not None
+        ):
+            changed_readback.append(f"BP {merged_data['bp_systolic']} by {merged_data['bp_diastolic']}")
+        if incoming.hb_g_dl is not None and merged_data.get("hb_g_dl") is not None:
+            changed_readback.append(f"Hemoglobin {merged_data['hb_g_dl']:g} g/dL")
+        for report in incoming.symptoms:
+            if report.presence is Presence.PRESENT:
+                label = _SYMPTOM_HINDI_LABELS.get(report.code) or report.phrase or report.code.value.replace("_", " ").lower()
+                changed_readback.append(label)
+
     symptoms_collected = state.get("symptoms_collected", False)
-    if incoming.symptoms or state.get("next_action") == "ASK_SYMPTOMS":
+    if incoming.symptoms or prev_action == "ASK_SYMPTOMS":
         symptoms_collected = True
 
     return {
         "visit_values": ExtractedVisit.model_validate(merged_data).model_dump(mode="json"),
         "patient": PatientReference.model_validate(current_patient).model_dump(mode="json"),
+        "is_pregnant": is_pregnant,
+        "correction_target": None,
+        "changed_readback": changed_readback,
         "symptoms_collected": symptoms_collected,
         "is_confirmation_turn": False,
         "verification": "UNVERIFIED",
@@ -326,7 +430,7 @@ def _next_missing_action(state: CallState, require_full_checklist: bool) -> str 
         return "ASK_PATIENT_NAME"
     if not patient.spouse_or_guardian_name:
         return "ASK_SPOUSE_NAME"
-    if visit.gestational_weeks is None:
+    if visit.gestational_weeks is None and state.get("is_pregnant") is not False:
         return "ASK_WEEKS"
     if visit.bp_systolic is None or visit.bp_diastolic is None:
         return "ASK_BP"
@@ -352,10 +456,7 @@ def ask_repeat_node(state: CallState) -> dict[str, str]:
     prompt = "Kripya BP ke dono number dobara batayein." if first_error.field == "blood_pressure" else f"{first_error.message} Kripya sahi value dobara batayein."
     triage = TriageResult.model_validate(state.get("triage_result", {"level": "ROUTINE"}))
     if triage.level in (TriageLevel.URGENT, TriageLevel.CRITICAL):
-        prompt = (
-            f"Screening {triage.level.value} hai. Kripya PHC team se jaldi sampark karein; "
-            f"yeh diagnosis nahi hai. {prompt}"
-        )
+        prompt = f"Screening {triage.level.value} hai, kripya PHC team se jaldi sampark karein. {prompt}"
     return {"next_action": "REPEAT_VALUE", "reply_text": prompt}
 
 
@@ -363,12 +464,11 @@ def collect_missing_node(state: CallState, *, require_full_checklist: bool) -> d
     action = _next_missing_action(state, require_full_checklist)
     if action is None:
         return {"next_action": "CONFIRM_VALUES", "reply_text": "Kripya in jaankariyon ko confirm karein."}
-    triage = TriageResult.model_validate(state.get("triage_result", {"level": "ROUTINE"}))
     prompt = _ACTION_PROMPTS[action]
-    if triage.level in (TriageLevel.URGENT, TriageLevel.CRITICAL):
+    if action == "ASK_BP" and state.get("is_pregnant") is False and state.get("next_action") == "ASK_WEEKS":
         prompt = (
-            f"Screening {triage.level.value} hai. Kripya PHC team se jaldi sampark karein; "
-            f"yeh diagnosis nahi hai. {prompt}"
+            "Ji Didi, Non-Pregnant checkup note ho gaya. "
+            "Unka BP (blood pressure) kitna aaya hai? Systolic aur diastolic dono number batayein."
         )
     return {"next_action": action, "reply_text": prompt}
 
@@ -379,14 +479,16 @@ def readback_node(state: CallState) -> dict[str, str]:
     triage = TriageResult.model_validate(state["triage_result"])
     fields: list[str] = []
     if patient.full_name:
-        identity = patient.full_name
+        identity = f"marij ka naam {patient.full_name}"
         if patient.spouse_or_guardian_name:
-            identity += f" W/o {patient.spouse_or_guardian_name}"
+            identity += f", pati ka naam {patient.spouse_or_guardian_name}"
         if patient.village:
             identity += f", gaon {patient.village}"
         fields.append(identity)
     if visit.gestational_weeks is not None:
         fields.append(f"{visit.gestational_weeks} hafte")
+    elif state.get("is_pregnant") is False:
+        fields.append("Non-Pregnant Checkup")
     if visit.bp_systolic is not None and visit.bp_diastolic is not None:
         fields.append(f"BP {visit.bp_systolic} by {visit.bp_diastolic}")
     if visit.hb_g_dl is not None:
@@ -396,20 +498,32 @@ def readback_node(state: CallState) -> dict[str, str]:
         and all(report.presence is Presence.ABSENT for report in visit.symptoms)
     )
     if all_symptoms_absent:
-        fields.append("koi listed danger symptom nahi bataya gaya")
+        fields.append("koi danger lakshan nahi")
     else:
         for report in visit.symptoms:
-            if report.presence is not Presence.UNKNOWN:
-                label = report.phrase or report.code.value.replace("_", " ").lower()
-                fields.append(f"{label}: {report.presence.value.lower()}")
+            if report.presence is Presence.PRESENT:
+                label = _SYMPTOM_HINDI_LABELS.get(report.code) or report.phrase or report.code.value.replace("_", " ").lower()
+                fields.append(label)
+            elif report.presence is Presence.ABSENT:
+                label = _SYMPTOM_HINDI_LABELS.get(report.code) or report.phrase or report.code.value.replace("_", " ").lower()
+                fields.append(f"{label} nahi hai")
     summary = ", ".join(fields) if fields else "abhi koi visit detail record nahi hui"
-    rules = ", ".join(triage.rules_fired) or "koi danger rule trigger nahi hua"
+    changed_readback = state.get("changed_readback") or []
+    if changed_readback:
+        changed_summary = ", ".join(changed_readback)
+        reply_text = (
+            f"Theek hai, badal diya: {changed_summary}. Screening {triage.level.value} hai. "
+            "Kya yeh jaankari sahi hai?"
+        )
+    else:
+        reply_text = (
+            f"Didi, confirm karein: {summary}. Screening {triage.level.value} hai. "
+            "Kya yeh jaankari sahi hai?"
+        )
     return {
         "next_action": "CONFIRM_VALUES",
-        "reply_text": (
-            f"Didi, confirm karein: {summary}. Screening {triage.level.value} hai, "
-            f"{rules}. Kya yeh jaankari sahi hai? Yeh diagnosis nahi hai."
-        ),
+        "changed_readback": [],
+        "reply_text": reply_text,
         "triage_summary": f"{triage.level.value}; rules: {', '.join(triage.rules_fired) or 'none'}; screening only.",
     }
 
@@ -432,7 +546,8 @@ def build_call_graph(
                 visit=fixture_model,
             )
         else:
-            result = await extractor(state.get("utterance", ""), state.get("next_action"))
+            effective_action = state.get("correction_target") or state.get("next_action")
+            result = await extractor(state.get("utterance", ""), effective_action)
         return {
             "turn_extraction": result.model_dump(mode="json"),
             "extracted_turn": ExtractedVisit().model_dump(mode="json"),
@@ -455,15 +570,25 @@ def build_call_graph(
         except Exception:
             logger.exception("Patient history lookup failed; continuing intake without a match")
             return {"history_checked": True, "patient_match_status": "UNAVAILABLE"}
+        if not candidates:
+            return {
+                "history_candidates": [],
+                "history_candidate_index": 0,
+                "history_checked": True,
+                "patient_match_status": "NEW",
+            }
+        top_candidate = candidates[0]
         return {
             "history_candidates": candidates,
             "history_candidate_index": 0,
+            "matched_history": top_candidate,
+            "matched_patient_id": top_candidate.get("patient_id"),
             "history_checked": True,
-            "patient_match_status": "NEW" if not candidates else "UNAVAILABLE",
+            "patient_match_status": "EXISTING",
         }
 
-    def _route_history(state: CallState) -> Literal["prompt", "validate"]:
-        return "prompt" if state.get("history_candidates") else "validate"
+    def _route_history(_: CallState) -> Literal["prompt", "validate"]:
+        return "validate"
 
     def _route_history_no(state: CallState) -> Literal["another", "resume"]:
         return "another" if state.get("history_candidate_index", 0) < len(state.get("history_candidates", [])) else "resume"

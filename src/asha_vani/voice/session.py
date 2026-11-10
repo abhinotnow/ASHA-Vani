@@ -13,16 +13,41 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import struct
 import time
 from typing import Any
 
-from asha_vani.voice.audio import FRAME_BYTES, FrameBuffer
+from asha_vani.voice.audio import FRAME_BYTES, SAMPLE_RATE_HZ, FrameBuffer
 from asha_vani.voice.events import CallEvent, CallEventType, EventSink
 from asha_vani.voice.stt import EndOfUtteranceDetector, STTChunk
 from asha_vani.voice.tts import TextToSpeech
 from asha_vani.voice.turn_runner import LangGraphTurnRunner, TurnOutput, TurnRunner, VerificationStatus
 
 DEFAULT_TAIL_MUTE_S: float = 0.20  # 200 ms post-TTS tail mute
+PCM16_BYTES_PER_SECOND: float = float(SAMPLE_RATE_HZ * 2)  # 16,000 bytes/s @ 8 kHz mono PCM16
+
+
+def build_pcm16_wav(pcm16_bytes: bytes, sample_rate: int = SAMPLE_RATE_HZ) -> bytes:
+    """Wrap raw 16-bit mono PCM bytes in a standard 44-byte RIFF WAVE header."""
+    data_size = len(pcm16_bytes)
+    byte_rate = sample_rate * 2
+    header = struct.pack(
+        "<4sI4s4sIHHIIHH4sI",
+        b"RIFF",
+        36 + data_size,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,  # PCM format
+        1,  # 1 channel (mono)
+        sample_rate,
+        byte_rate,
+        2,  # block align
+        16,  # bits per sample
+        b"data",
+        data_size,
+    )
+    return header + pcm16_bytes
 
 
 class HalfDuplexGate:
@@ -41,9 +66,9 @@ class HalfDuplexGate:
     def start_speaking(self) -> None:
         self._speaking = True
 
-    def stop_speaking(self) -> None:
+    def stop_speaking(self, extra_playback_s: float = 0.0) -> None:
         self._speaking = False
-        self._mute_until = self._clock() + self.tail_mute_s
+        self._mute_until = self._clock() + max(0.0, extra_playback_s) + self.tail_mute_s
 
     @property
     def is_mic_muted(self) -> bool:
@@ -65,6 +90,7 @@ class CallSession:
         tts: TextToSpeech | None = None,
         sinks: list[EventSink] | None = None,
         tail_mute_s: float = DEFAULT_TAIL_MUTE_S,
+        realtime_playback_hold: bool = False,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.session_id = session_id
@@ -73,6 +99,7 @@ class CallSession:
         self.turn_runner: TurnRunner = turn_runner or LangGraphTurnRunner()
         self.tts = tts
         self.sinks: list[EventSink] = list(sinks or [])
+        self.realtime_playback_hold = realtime_playback_hold
         self._clock = clock
 
         self.duplex_gate = HalfDuplexGate(tail_mute_s=tail_mute_s, clock=clock)
@@ -82,12 +109,26 @@ class CallSession:
         self.accepted_frames: list[bytes] = []
         self.dropped_mic_bytes: int = 0
         self.speaker_out_frames: list[bytes] = []
+        self.call_audio_pcm16: bytearray = bytearray()
         self.turn_history: list[TurnOutput] = []
 
         self._event_seq: int = 0
         self._utterance_seq: int = 0
         self._started_at: float = self._clock()
         self._turn_lock = asyncio.Lock()
+
+    def record_speaker_audio(self, pcm16_bytes: bytes) -> None:
+        """Append synthesized TTS audio to the session's continuous call recording."""
+        if not pcm16_bytes:
+            return
+        if len(pcm16_bytes) >= 44 and pcm16_bytes[:4] == b"RIFF":
+            pcm16_bytes = pcm16_bytes[44:]
+        self.speaker_out_frames.append(pcm16_bytes)
+        self.call_audio_pcm16.extend(pcm16_bytes)
+
+    def build_call_wav(self) -> bytes:
+        """Return a complete 8 kHz 16-bit mono WAV of the entire call timeline."""
+        return build_pcm16_wav(bytes(self.call_audio_pcm16), sample_rate=SAMPLE_RATE_HZ)
 
     async def _emit(self, event_type: CallEventType, payload: dict[str, Any]) -> CallEvent:
         self._event_seq += 1
@@ -120,6 +161,8 @@ class CallSession:
 
         frames = self.frame_buffer.push(pcm16_bytes)
         self.accepted_frames.extend(frames)
+        for frame in frames:
+            self.call_audio_pcm16.extend(frame)
         return frames
 
     async def receive_stt_chunk(
@@ -166,6 +209,7 @@ class CallSession:
 
             # Synthesize TTS reply under strict half-duplex speaker gate
             tts_first_byte_ms = 0.0
+            tts_bytes_sent = 0
             if self.tts is not None and turn_out.reply_text:
                 self.duplex_gate.start_speaking()
                 self.frame_buffer.clear()
@@ -177,9 +221,15 @@ class CallSession:
                         if first_chunk:
                             tts_first_byte_ms = round((self._clock() - tts_t0) * 1000.0, 2)
                             first_chunk = False
-                        self.speaker_out_frames.append(audio_frame)
+                        self.record_speaker_audio(audio_frame)
+                        tts_bytes_sent += len(audio_frame)
                 finally:
-                    self.duplex_gate.stop_speaking()
+                    extra_hold_s = 0.0
+                    if self.realtime_playback_hold and tts_bytes_sent > 0:
+                        elapsed_s = max(0.0, self._clock() - tts_t0)
+                        playback_s = tts_bytes_sent / PCM16_BYTES_PER_SECOND
+                        extra_hold_s = max(0.0, playback_s - elapsed_s)
+                    self.duplex_gate.stop_speaking(extra_playback_s=extra_hold_s)
 
             await self._emit(
                 CallEventType.TURN_COMPLETED,

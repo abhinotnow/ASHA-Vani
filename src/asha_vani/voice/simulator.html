@@ -1988,7 +1988,23 @@
         </div>
       `).join("") : `<div class="turn-card" style="color: var(--text-muted); font-size: 12px;">Call connected — speak into mic or type on Nokia keypad and press SEND.</div>`;
 
+      const recKey = encodeURIComponent(v.sessionId || v.id || "demo");
+      const recUrl = `/api/recordings/${recKey}`;
+
       modalBody.innerHTML = `
+        <div>
+          <div class="section-heading">
+            <span>Full Call Audio Recording</span>
+            <span class="mono-val" style="font-size: 11px; color: var(--text-secondary);">Session: ${v.sessionId || v.id}</span>
+          </div>
+          <div class="dispatch-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <audio controls preload="none" src="${recUrl}" style="height: 32px; flex: 1; min-width: 220px;"></audio>
+            <a class="dispatch-opt-btn" href="${recUrl}" download="asha-vani-${recKey}.wav" style="text-decoration: none;">
+              <span>Download Audio</span>
+            </a>
+          </div>
+        </div>
+
         <div>
           <div class="section-heading">
             <span>Home Dispatch & Field Response</span>
@@ -2644,14 +2660,18 @@
               ttsFailed = false;
               speakReplyHalfDuplex(msg.reply_text);
             }
+          } else if (msg.type === "call_ended") {
+            const waitEndMs = playbackContext
+              ? Math.max(0, (playbackCursor - playbackContext.currentTime) * 1000) + 180
+              : 180;
+            setTimeout(() => endLiveCall(), waitEndMs);
           } else if (msg.type === "tts_start") {
             ttsFailed = false;
             ttsStreamActive = true;
             pauseMicForTTS();
             if (playbackContext) {
               playbackContext.resume().catch(() => {});
-              playbackCursor = playbackContext.currentTime + 0.04;
-              playbackQueue = Promise.resolve();
+              playbackCursor = Math.max(playbackCursor, playbackContext.currentTime + 0.04);
             }
           } else if (msg.type === "tts_end") {
             ttsStreamActive = false;

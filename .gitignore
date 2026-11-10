@@ -21,4 +21,5 @@ skills-lock.json
 graphify-out/
 brag-output/
 brag-output-*/
+.local_register_cache.json
 

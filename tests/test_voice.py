@@ -319,7 +319,7 @@ def test_step_by_step_full_checklist_flow(monkeypatch) -> None:
         assert t5 is not None
         assert t5.visit_values.hb_g_dl == 9.5
         assert t5.next_action == "CONFIRM_VALUES"
-        assert "Sunita Devi W/o Rakesh Kumar" in t5.reply_text
+        assert "marij ka naam Sunita Devi, pati ka naam Rakesh Kumar" in t5.reply_text
         assert "28 hafte" in t5.reply_text
         assert "BP 150 by 95" in t5.reply_text
         assert "Hemoglobin 9.5 g/dL" in t5.reply_text
@@ -370,12 +370,19 @@ def test_non_pregnant_and_dtmf_keypad_flow(monkeypatch) -> None:
         assert t5.visit_values.bp_diastolic == 95
         assert t5.next_action == "ASK_HB"
 
-        # Hb 6.5 -> moves to CONFIRM_VALUES with Non-Pregnant Checkup
+        # Hb 6.5 -> moves to ASK_SYMPTOMS so stomach pain / danger signs are checked even for non-pregnant visits
         t6 = await session.process_utterance("6.5")
         assert t6 is not None
         assert t6.visit_values.hb_g_dl == 6.5
-        assert t6.next_action == "CONFIRM_VALUES"
-        assert "Non-Pregnant Checkup" in t6.reply_text
+        assert t6.next_action == "ASK_SYMPTOMS"
+        assert "pet mein dard" in t6.reply_text
+
+        # Symptom check -> moves to CONFIRM_VALUES with Non-Pregnant Checkup
+        t6b = await session.process_utterance("Koi takleef nahi")
+        assert t6b is not None
+        assert t6b.next_action == "CONFIRM_VALUES"
+        assert "Non-Pregnant Checkup" in t6b.reply_text
+        assert "diagnosis" not in t6b.reply_text.lower()
 
         # DTMF keypad '1' to confirm readback -> VERIFIED
         t7 = await session.process_utterance("1")
@@ -384,6 +391,78 @@ def test_non_pregnant_and_dtmf_keypad_flow(monkeypatch) -> None:
         assert t7.verification is VerificationStatus.VERIFIED
 
     asyncio.run(_run_non_pregnant())
+
+
+def test_zero_weeks_and_spouse_surname_and_stomach_pain_edge_cases(monkeypatch) -> None:
+    """Verify '0 weeks' / '0' for non-pregnant, spouse surname preservation ('Rakesh Yadav'), and 'pet dard' extraction."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    async def _run_edges() -> None:
+        runner = LangGraphTurnRunner(require_full_checklist=True)
+        tts = FakeTTS(frames_per_reply=2)
+        session = CallSession("sess-edges", turn_runner=runner, tts=tts)
+        await session.start()
+
+        # Turn 1: Wife name ("Sunita Devi")
+        t1 = await session.process_utterance("Rampur se Sunita Devi")
+        assert t1 is not None
+        assert t1.patient.full_name == "Sunita Devi"
+        assert t1.next_action == "ASK_SPOUSE_NAME"
+
+        # Turn 2: Husband name with shared surname ("Rakesh Yadav") must NOT overwrite wife's name!
+        t2 = await session.process_utterance("Rakesh Yadav")
+        assert t2 is not None
+        assert t2.patient.full_name == "Sunita Devi"
+        assert t2.patient.spouse_or_guardian_name == "Rakesh Yadav"
+        assert t2.next_action == "ASK_WEEKS"
+
+        # Turn 3: '0 weeks' must NOT trigger [4, 44] validation error; it sets is_pregnant=False and asks BP
+        t3 = await session.process_utterance("0 weeks")
+        assert t3 is not None
+        assert t3.is_pregnant is False
+        assert t3.visit_values.gestational_weeks is None
+        assert not t3.validation_result.has_errors
+        assert t3.next_action == "ASK_BP"
+
+        # Turn 4: BP 120 by 80 -> asks Hb
+        t4 = await session.process_utterance("BP 120 by 80")
+        assert t4 is not None
+        assert t4.next_action == "ASK_HB"
+
+        # Turn 5: Hb 11.2 + stomach pain ("pet mein dard hai") -> EPIGASTRIC_PAIN triggers R2 URGENT
+        t5 = await session.process_utterance("Hb 11.2 hai aur pet mein dard hai")
+        assert t5 is not None
+        assert SymptomCode.EPIGASTRIC_PAIN in t5.visit_values.present_symptoms
+        assert "R2" in t5.triage_result.rules_fired
+        assert t5.triage_result.level is TriageLevel.URGENT
+        assert t5.next_action == "CONFIRM_VALUES"
+        assert "marij ka naam Sunita Devi, pati ka naam Rakesh Yadav" in t5.reply_text
+        assert "pet mein dard" in t5.reply_text
+        assert "diagnosis" not in t5.reply_text.lower()
+
+        # Turn 6: Inline correction at CONFIRM_VALUES ("a sir, pati ka naam galat hai. pati ka naam abhinav hai")
+        t6 = await session.process_utterance("a sir, pati ka naam galat hai. pati ka naam abhinav hai")
+        assert t6 is not None
+        assert t6.patient.full_name == "Sunita Devi"
+        assert t6.patient.spouse_or_guardian_name == "Abhinav"
+        assert t6.next_action == "CONFIRM_VALUES"
+        assert "Theek hai, badal diya: pati ka naam Abhinav" in t6.reply_text
+
+        # Turn 7: Devanagari correction at CONFIRM_VALUES -> transliterated to English ("Abhinav Pranav Raj")
+        t7 = await session.process_utterance("अरे सर पति का नाम गलत है पति का नाम अभिनव प्रणव राज है")
+        assert t7 is not None
+        assert t7.patient.full_name == "Sunita Devi"
+        assert t7.patient.spouse_or_guardian_name == "Abhinav Pranav Raj"
+        assert t7.next_action == "CONFIRM_VALUES"
+        assert "Theek hai, badal diya: pati ka naam Abhinav Pranav Raj" in t7.reply_text
+
+        # Verify full-call WAV builder produces a valid RIFF WAVE header + audio payload
+        wav_bytes = session.build_call_wav()
+        assert wav_bytes[:4] == b"RIFF"
+        assert wav_bytes[8:12] == b"WAVE"
+        assert len(wav_bytes) > 44
+
+    asyncio.run(_run_edges())
 
 
 

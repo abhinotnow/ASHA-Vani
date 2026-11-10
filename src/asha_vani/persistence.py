@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 import re
+import time
 from typing import Any
 
+from asha_vani.extraction import transliterate_to_english
 from asha_vani.voice.events import CallEvent, CallEventType
 
 logger = logging.getLogger(__name__)
+_LOCAL_CACHE_PATH = Path(__file__).resolve().parents[2] / ".local_register_cache.json"
+_OFFLINE_COOLDOWN_S = 120.0
 
 
 class SupabaseEventSink:
@@ -21,6 +27,9 @@ class SupabaseEventSink:
     """
 
     def __init__(self, url: str, service_role_key: str, *, client: Any | None = None) -> None:
+        self._url = url
+        self._service_role_key = service_role_key
+        self._custom_client = client is not None
         if client is None:
             from supabase import create_client
 
@@ -29,23 +38,121 @@ class SupabaseEventSink:
         self._pending: list[CallEvent] = []
         self._pending_limit = 500
         self._lock = asyncio.Lock()
+        self._warned_unreachable = False
+        self._offline_until: float = 0.0
+        self._cached_register: dict[str, list[dict[str, Any]]] = self._load_disk_cache()
+
+    def _load_disk_cache(self) -> dict[str, list[dict[str, Any]]]:
+        if not self._custom_client and _LOCAL_CACHE_PATH.exists():
+            try:
+                raw = json.loads(_LOCAL_CACHE_PATH.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    return _sanitize_register_payload(
+                        {
+                            "visits": list(raw.get("visits") or []),
+                            "events": list(raw.get("events") or []),
+                            "calls": list(raw.get("calls") or []),
+                        }
+                    )
+            except Exception:
+                pass
+        return {"visits": [], "events": [], "calls": []}
+
+    def _save_disk_cache(self) -> None:
+        if self._custom_client:
+            return
+        try:
+            _LOCAL_CACHE_PATH.write_text(
+                json.dumps(self._cached_register, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    def _reconnect_client_if_possible(self) -> None:
+        if self._custom_client:
+            return
+        try:
+            from supabase import create_client
+
+            self._client = create_client(self._url, self._service_role_key)
+        except Exception:
+            pass
 
     async def emit(self, event: CallEvent) -> None:
         async with self._lock:
+            self._record_in_local_cache(event)
+            if not self._custom_client and time.monotonic() < self._offline_until:
+                self._pending.append(event)
+                self._pending = self._pending[-self._pending_limit :]
+                return
             batch = [*self._pending, event]
             self._pending = []
             for index, item in enumerate(batch):
                 try:
                     await asyncio.to_thread(self._persist_one, item)
-                except Exception:
-                    logger.exception(
-                        "Could not persist call event %s/%s; retaining for retry",
-                        item.session_id,
-                        item.seq,
-                    )
+                    self._warned_unreachable = False
+                except Exception as exc:
+                    if not self._warned_unreachable:
+                        logger.info(
+                            "Supabase cloud unreachable (%s); using local cache (.local_register_cache.json)",
+                            exc.__class__.__name__,
+                        )
+                        self._warned_unreachable = True
+                    self._offline_until = time.monotonic() + _OFFLINE_COOLDOWN_S
+                    self._reconnect_client_if_possible()
                     self._pending.extend(batch[index:])
                     self._pending = self._pending[-self._pending_limit :]
                     break
+
+    def _record_in_local_cache(self, event: CallEvent) -> None:
+        payload = event.payload
+        self._cached_register["events"].append(
+            {
+                "session_id": event.session_id,
+                "seq": event.seq,
+                "event_type": event.event_type.value,
+                "occurred_at": event.timestamp,
+                "is_simulated": event.is_simulated,
+                "payload": payload,
+            }
+        )
+        if event.event_type is CallEventType.CALL_STARTED:
+            self._cached_register["calls"].insert(
+                0,
+                {
+                    "session_id": event.session_id,
+                    "caller": payload.get("caller"),
+                    "source": payload.get("source", "BROWSER_SIM"),
+                    "is_simulated": event.is_simulated,
+                    "started_at": event.timestamp,
+                },
+            )
+        elif event.event_type is CallEventType.TURN_COMPLETED:
+            visit_number = int(payload.get("visit_number", 1))
+            row = {
+                "session_id": event.session_id,
+                "visit_number": visit_number,
+                "patient_id": payload.get("matched_patient_id"),
+                "patient": payload.get("patient", {}),
+                "visit_values": payload.get("visit_values", {}),
+                "triage": payload.get("triage", {}),
+                "verification": payload.get("verification", "UNVERIFIED"),
+                "updated_at": event.timestamp,
+            }
+            existing = next(
+                (
+                    v
+                    for v in self._cached_register["visits"]
+                    if v.get("session_id") == event.session_id and v.get("visit_number") == visit_number
+                ),
+                None,
+            )
+            if existing is not None:
+                existing.update(row)
+            else:
+                self._cached_register["visits"].insert(0, row)
+        self._save_disk_cache()
 
     def _persist_one(self, event: CallEvent) -> None:
         payload = event.payload
@@ -149,21 +256,49 @@ class SupabaseEventSink:
 
     async def load_register(self) -> dict[str, list[dict[str, Any]]]:
         """Fetch saved visit snapshots and their event history for console hydration."""
-        return await asyncio.to_thread(self._load_register)
+        async with self._lock:
+            if not self._custom_client and time.monotonic() < self._offline_until:
+                return dict(self._cached_register)
+            try:
+                data = await asyncio.to_thread(self._load_register)
+                self._cached_register = data
+                self._warned_unreachable = False
+                self._save_disk_cache()
+                return data
+            except Exception as exc:
+                if not self._warned_unreachable:
+                    logger.info(
+                        "Supabase cloud endpoint unreachable (%s); using local register cache",
+                        exc.__class__.__name__,
+                    )
+                    self._warned_unreachable = True
+                self._offline_until = time.monotonic() + _OFFLINE_COOLDOWN_S
+                self._reconnect_client_if_possible()
+                return dict(self._cached_register)
 
     def _load_register(self) -> dict[str, list[dict[str, Any]]]:
         visits_result = self._client.table("visits").select("*").order("updated_at", desc=True).execute()
         events_result = self._client.table("call_events").select("*").order("occurred_at").execute()
         calls_result = self._client.table("calls").select("*").order("started_at", desc=True).execute()
-        return {
-            "visits": list(visits_result.data or []),
-            "events": list(events_result.data or []),
-            "calls": list(calls_result.data or []),
-        }
+        return _sanitize_register_payload(
+            {
+                "visits": list(visits_result.data or []),
+                "events": list(events_result.data or []),
+                "calls": list(calls_result.data or []),
+            }
+        )
 
     async def find_patient_history(self, patient: dict[str, Any], limit: int = 3) -> list[dict[str, Any]]:
         """Return exact identity candidates; callers must ask the ASHA to confirm."""
-        return await asyncio.to_thread(self._find_patient_history, patient, limit)
+        async with self._lock:
+            if not self._custom_client and time.monotonic() < self._offline_until:
+                return []
+            try:
+                return await asyncio.to_thread(self._find_patient_history, patient, limit)
+            except Exception:
+                self._offline_until = time.monotonic() + _OFFLINE_COOLDOWN_S
+                self._reconnect_client_if_possible()
+                return []
 
     def _find_patient_history(self, patient: dict[str, Any], limit: int) -> list[dict[str, Any]]:
         name = _normalize_identity(patient.get("full_name"))
@@ -212,3 +347,33 @@ class SupabaseEventSink:
 
 def _normalize_identity(value: Any) -> str:
     return re.sub(r"[^\w]+", "", str(value or "").casefold(), flags=re.UNICODE)
+
+
+def _english_patient_dict(patient: Any) -> dict[str, Any]:
+    if not isinstance(patient, dict):
+        return {}
+    out = dict(patient)
+    for key in ("full_name", "spouse_or_guardian_name", "village", "tola"):
+        val = out.get(key)
+        if isinstance(val, str) and val.strip():
+            roman = transliterate_to_english(val).strip()
+            if roman:
+                out[key] = roman.title()
+    return out
+
+
+def _sanitize_register_payload(data: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    for visit in data.get("visits", []):
+        if isinstance(visit, dict):
+            if isinstance(visit.get("patient"), dict):
+                visit["patient"] = _english_patient_dict(visit["patient"])
+            if isinstance(visit.get("final_report"), dict) and isinstance(visit["final_report"].get("patient"), dict):
+                visit["final_report"]["patient"] = _english_patient_dict(visit["final_report"]["patient"])
+    for ev in data.get("events", []):
+        if isinstance(ev, dict) and isinstance(ev.get("payload"), dict):
+            payload = ev["payload"]
+            if isinstance(payload.get("patient"), dict):
+                payload["patient"] = _english_patient_dict(payload["patient"])
+            if isinstance(payload.get("final_report"), dict) and isinstance(payload["final_report"].get("patient"), dict):
+                payload["final_report"]["patient"] = _english_patient_dict(payload["final_report"]["patient"])
+    return data

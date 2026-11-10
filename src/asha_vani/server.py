@@ -20,18 +20,18 @@ import urllib.request
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from asha_vani.voice.events import CallEvent
-from asha_vani.voice.session import CallSession
+from asha_vani.voice.session import PCM16_BYTES_PER_SECOND, CallSession, build_pcm16_wav
 from asha_vani.voice.stt import GnaniPrismaSTT
 from asha_vani.voice.tts import FakeTTS, FixedScriptCache, GnaniTimbreTTS, TextToSpeech
 from asha_vani.voice.turn_runner import LangGraphTurnRunner
 from asha_vani.persistence import SupabaseEventSink
-from asha_vani.voice.audio import FRAME_BYTES
+from asha_vani.voice.audio import FRAME_BYTES, condition_telephone_audio
 from asha_vani.voice.exotel import (
     ExotelMediaChunker,
     ExotelProtocolError,
@@ -96,7 +96,17 @@ class WebSocketConsoleBroadcaster:
 
 broadcaster = WebSocketConsoleBroadcaster()
 active_sessions: dict[str, CallSession] = {}
+call_recordings_store: dict[str, tuple[bytes, str]] = {}
 dispatches_store: dict[str, dict[str, Any]] = {}
+
+
+def _save_session_recording(session: CallSession) -> None:
+    """Persist the session's continuous call audio into `call_recordings_store` if not already uploaded."""
+    existing = call_recordings_store.get(session.session_id)
+    if existing and existing[1] != "audio/wav":
+        return  # Keep high-level browser MediaRecorder upload (.webm / .mp4) if already present
+    if len(session.call_audio_pcm16) > 0:
+        call_recordings_store[session.session_id] = (session.build_call_wav(), "audio/wav")
 supabase_sink: SupabaseEventSink | None = None
 if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
     try:
@@ -176,13 +186,12 @@ async def health() -> dict[str, Any]:
 async def load_register() -> dict[str, Any]:
     """Return saved final visit reports and call history for console hydration."""
     if supabase_sink is None:
-        return {"configured": False, "visits": [], "events": []}
+        return {"configured": False, "visits": [], "events": list(broadcaster.history)}
     try:
         data = await supabase_sink.load_register()
-    except Exception:
-        import logging
-        logging.getLogger(__name__).exception("Saved register could not be loaded")
-        return {"configured": True, "available": False, "visits": [], "events": [], "calls": []}
+    except Exception as exc:
+        logger.warning("Saved register could not be loaded (%s); using in-memory history", exc)
+        return {"configured": True, "available": False, "visits": [], "events": list(broadcaster.history), "calls": []}
     return {"configured": True, "available": True, **data}
 
 
@@ -360,6 +369,7 @@ async def post_utterance_turn(req: UtteranceRequest) -> dict[str, Any]:
     if out is None:
         return {"session_id": sid, "ok": False, "reason": "empty_utterance"}
 
+    _save_session_recording(session)
     return {
         "session_id": sid,
         "ok": True,
@@ -372,8 +382,57 @@ async def end_call_endpoint(session_id: str, reason: str = "COMPLETED") -> dict[
     session = active_sessions.pop(session_id, None)
     if session is None:
         return {"session_id": session_id, "ended": False}
+    _save_session_recording(session)
     ev = await session.end(reason=reason)
     return {"session_id": session_id, "ended": True, "event": ev.model_dump(mode="json")}
+
+
+@app.post("/api/recordings/{session_id}")
+async def upload_call_recording(session_id: str, request: Request) -> dict[str, Any]:
+    """Store a full-call mixed recording (.webm / .mp4 / .wav) uploaded from the browser MediaRecorder."""
+    body = await request.body()
+    if not body:
+        return {"ok": False, "session_id": session_id, "bytes": 0}
+    content_type = request.headers.get("content-type", "audio/webm").split(";")[0].strip() or "audio/webm"
+    call_recordings_store[session_id] = (body, content_type)
+    return {"ok": True, "session_id": session_id, "bytes": len(body), "media_type": content_type}
+
+
+@app.get("/api/recordings/{session_id}")
+async def get_call_recording(session_id: str) -> Response:
+    """Serve the full all-in-one call recording for playback in the Inspection Sheet audio player."""
+    stored = call_recordings_store.get(session_id)
+    if stored is not None:
+        return Response(content=stored[0], media_type=stored[1])
+
+    live_session = active_sessions.get(session_id)
+    if live_session is not None and len(live_session.call_audio_pcm16) > 0:
+        return Response(content=live_session.build_call_wav(), media_type="audio/wav")
+
+    # Fallback: stitch cached TTS WAVs for sessions that ran in scripted/HTTP mode
+    stitched_pcm = bytearray()
+    for ev in broadcaster.history:
+        if ev.get("session_id") == session_id and ev.get("event_type") == "turn_completed":
+            reply = (ev.get("payload") or {}).get("reply_text", "")
+            for key, wav_bytes in _TTS_WAV_CACHE.items():
+                if key.endswith(f":{reply.strip()}") and len(wav_bytes) > 44:
+                    stitched_pcm.extend(wav_bytes[44:])
+                    stitched_pcm.extend(b"\x00" * 3200)
+                    break
+    if len(stitched_pcm) == 0:
+        # Provide a clean 1.5s 8 kHz PCM16 telemetry carrier tone + silence so <audio> always loads cleanly
+        import math
+        from array import array
+        samples = array(
+            "h",
+            (
+                int(4500 * math.sin(2.0 * math.pi * 440.0 * i / 8000)) if i < 2400 else 0
+                for i in range(12000)
+            ),
+        )
+        stitched_pcm.extend(samples.tobytes())
+    wav_out = build_pcm16_wav(bytes(stitched_pcm), sample_rate=8000)
+    return Response(content=wav_out, media_type="audio/wav")
 
 
 @app.websocket("/ws/console")
@@ -392,12 +451,14 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
     """Accept 8 kHz PCM16 for Prisma plus JSON utterances for replay/manual mode."""
     await ws.accept()
     sid = session_id or f"call-{uuid.uuid4().hex[:8]}"
+    tts_stream = WebSocketTimbreStream(ws)
     session = CallSession(
         sid,
         caller=caller,
         turn_runner=shared_turn_runner,
-        tts=WebSocketTimbreStream(ws),
+        tts=tts_stream,
         sinks=_session_sinks(),
+        realtime_playback_hold=True,
     )
     active_sessions[sid] = session
     await session.start()
@@ -408,20 +469,44 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
             "greeting_text": INITIAL_GREETING_HINGLISH,
         }
     )
-    async for _ in WebSocketTimbreStream(ws).synthesize(INITIAL_GREETING_HINGLISH):
-        pass
+    session.duplex_gate.start_speaking()
+    greet_t0 = asyncio.get_running_loop().time()
+    greet_bytes = 0
+    try:
+        async for chunk in tts_stream.synthesize(INITIAL_GREETING_HINGLISH):
+            session.record_speaker_audio(chunk)
+            greet_bytes += len(chunk)
+    finally:
+        greet_elapsed = max(0.0, asyncio.get_running_loop().time() - greet_t0)
+        greet_hold = max(0.0, (greet_bytes / PCM16_BYTES_PER_SECOND) - greet_elapsed)
+        session.duplex_gate.stop_speaking(extra_playback_s=greet_hold)
 
     end_reason = "DROPPED"
+    current_snr_db: float | None = None
+    call_done = asyncio.Event()
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=100)
+
+    def _drain_audio_queue() -> None:
+        while not audio_queue.empty():
+            try:
+                item = audio_queue.get_nowait()
+                if item is None:
+                    audio_queue.put_nowait(None)
+                    break
+            except asyncio.QueueEmpty:
+                break
 
     async def frames() -> AsyncIterator[bytes]:
         while True:
             frame = await audio_queue.get()
             if frame is None:
                 return
+            if session.duplex_gate.is_mic_muted:
+                continue
             yield frame
 
     async def consume_prisma() -> None:
+        nonlocal end_reason
         try:
             prisma = GnaniPrismaSTT(
                 api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
@@ -430,14 +515,23 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                 format="transcribe",
             )
             async for chunk in prisma.stream(frames()):
+                if session.duplex_gate.is_mic_muted:
+                    _drain_audio_queue()
+                    continue
                 turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
                 if turn is not None:
+                    _drain_audio_queue()
                     await ws.send_json({
                         "type": "turn_reply",
                         "session_id": sid,
                         "reply_text": turn.reply_text,
                         "turn": turn.model_dump(mode="json"),
                     })
+                    if turn.next_action == "END_CALL":
+                        end_reason = "COMPLETED"
+                        await ws.send_json({"type": "call_ended", "session_id": sid, "reason": "COMPLETED"})
+                        call_done.set()
+                        return
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -445,11 +539,29 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
 
     prisma_task = asyncio.create_task(consume_prisma())
     try:
-        while True:
-            msg = await ws.receive()
+        while not call_done.is_set():
+            receive_task = asyncio.create_task(ws.receive())
+            done_task = asyncio.create_task(call_done.wait())
+            finished, _ = await asyncio.wait(
+                {receive_task, done_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if done_task in finished and call_done.is_set():
+                receive_task.cancel()
+                await asyncio.gather(receive_task, return_exceptions=True)
+                break
+            done_task.cancel()
+            await asyncio.gather(done_task, return_exceptions=True)
+            msg = receive_task.result()
+            if msg.get("type") == "websocket.disconnect":
+                break
             if msg.get("bytes") is not None:
+                if session.duplex_gate.is_mic_muted:
+                    _drain_audio_queue()
+                raw_pcm = msg["bytes"]
+                if current_snr_db is not None and current_snr_db > 0 and len(raw_pcm) >= 4:
+                    raw_pcm = condition_telephone_audio(raw_pcm, src_rate=8000, snr_db=current_snr_db)
                 # FrameBuffer yields exact 1,024-byte audio blocks for Prisma.
-                for frame in session.push_mic_audio(msg["bytes"]):
+                for frame in session.push_mic_audio(raw_pcm):
                     if len(frame) != FRAME_BYTES:
                         continue
                     if audio_queue.full():
@@ -459,11 +571,13 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                             pass
                     audio_queue.put_nowait(frame)
             elif msg.get("text") is not None:
-                import json
-
                 data = json.loads(msg["text"])
                 mtype = data.get("type")
-                if mtype == "utterance":
+                if mtype == "noise":
+                    snr_val = data.get("snr_db")
+                    current_snr_db = float(snr_val) if snr_val is not None else None
+                elif mtype == "utterance":
+                    _drain_audio_queue()
                     out = await session.process_utterance(
                         str(data.get("text", "")),
                         stt_latency_ms=float(data.get("stt_latency_ms", 120.0)),
@@ -497,6 +611,7 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
             prisma_task.cancel()
         await asyncio.gather(prisma_task, return_exceptions=True)
         active_sessions.pop(sid, None)
+        _save_session_recording(session)
         await session.end(reason=end_reason)
         if end_reason == "COMPLETED":
             try:
@@ -575,8 +690,8 @@ async def ws_exotel(ws: WebSocket) -> None:
         session.eou_detector.clear()
         try:
             logger.info("Exotel greeting synthesis started")
-            async for _ in tts.synthesize(INITIAL_GREETING_HINGLISH):
-                pass
+            async for chunk in tts.synthesize(INITIAL_GREETING_HINGLISH):
+                session.record_speaker_audio(chunk)
             logger.info("Exotel greeting synthesis and playback mark completed")
         except asyncio.CancelledError:
             raise
@@ -698,6 +813,7 @@ async def ws_exotel(ws: WebSocket) -> None:
             await asyncio.gather(greeting_task, return_exceptions=True)
         if session is not None:
             active_sessions.pop(session.session_id, None)
+            _save_session_recording(session)
             await session.end(reason=end_reason)
             if end_reason == "COMPLETED":
                 try:

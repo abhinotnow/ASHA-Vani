@@ -1317,6 +1317,18 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
                 </div>
               </div>
 
+              <!-- Full Call Recording Replay Bar -->
+              <div class="stepper-strip" style="justify-content: space-between;">
+                <div style="display: flex; flex-direction: column; gap: var(--space-3xs);">
+                  <span style="font-size: var(--text-xs); font-weight: 500; color: var(--color-ink);">Full call audio recording</span>
+                  <span class="num" id="sheetAudioMeta" style="font-size: var(--text-xs); color: var(--color-muted);">8 kHz mono continuous stream</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap;">
+                  <audio id="sheetCallAudio" controls preload="none" style="height: 30px; max-width: 240px;"></audio>
+                  <a id="sheetAudioDownload" class="btn btn--sm" href="/api/recordings/demo" download="asha-vani-call.wav">Download</a>
+                </div>
+              </div>
+
               <!-- Turn-by-Turn Ledger Table (Clean Ruled Lines like furrow.jpg "Inspection record") -->
               <div>
                 <div class="ruled-section-title">
@@ -1508,25 +1520,6 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
               <button class="noise-btn" type="button" data-snr="5">5 dB</button>
             </div>
           </div>
-
-          <div class="dock-card">
-            <div class="dock-row-label">
-              <span>Scripted field scenarios</span>
-              <span class="num">SIM</span>
-            </div>
-            <button class="scenario-btn" type="button" onclick="simulateScenario('critical')">
-              <span>1. Maternal severe BP (160/110)</span>
-              <span class="tag tag--critical">R1+R2</span>
-            </button>
-            <button class="scenario-btn" type="button" onclick="simulateScenario('nonpregnant')">
-              <span>2. Non-pregnant severe anemia</span>
-              <span class="tag tag--urgent">R5</span>
-            </button>
-            <button class="scenario-btn" type="button" onclick="simulateScenario('garbled')">
-              <span>3. Garbled BP 420/110 refusal</span>
-              <span class="tag tag--neutral">Guard</span>
-            </button>
-          </div>
         </div>
       </aside>
     </div>
@@ -1551,6 +1544,7 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
         id: "vis-101",
         session_id: "seed-101",
         patient_name: "Sunita Devi",
+        patient_spouse: "Rakesh Kumar",
         patient_age: 24,
         village: "Rampur",
         asha_id: "ASHA-104",
@@ -1824,13 +1818,14 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
         : (visit.hb_g_dl != null ? `${visit.hb_g_dl} g/dL` : "In call");
       document.getElementById("cardBigFigure").textContent = bpDisplay;
 
+      const spouseLabel = visit.patient_spouse ? ` (Husband: ${visit.patient_spouse})` : "";
       document.getElementById("cardPatientTitle").textContent =
-        `${visit.patient_name || "Incoming caller"}${visit.patient_age ? ", " + visit.patient_age + " yrs" : ""} (${visit.village || "Rampur"})`;
+        `${visit.patient_name || "Incoming caller"}${spouseLabel}${visit.patient_age ? ", " + visit.patient_age + " yrs" : ""} (${visit.village || "Rampur"})`;
       document.getElementById("cardTimeLabel").textContent =
         visit.verification === "VERIFIED" ? `Verified ${visit.updated_at}` : `Unverified (in call)`;
 
       document.getElementById("cellPatient").textContent =
-        `${visit.patient_name || "Pending"}${visit.patient_age ? " (" + visit.patient_age + "y)" : ""}`;
+        `${visit.patient_name || "Pending"}${spouseLabel}${visit.patient_age ? " (" + visit.patient_age + "y)" : ""}`;
       document.getElementById("cellWorker").textContent =
         `${visit.asha_id || "Pending"}, ${visit.village || "Rampur"}`;
       document.getElementById("cellPreg").textContent = isNonPreg
@@ -1865,9 +1860,26 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
 
       // Update Right White Sheet: Turn-by-Turn Voice Transcript Table
       document.getElementById("sheetHeading").textContent =
-        `Inspection record: ${visit.patient_name || "Active call"}`;
+        `Inspection record: ${visit.patient_name || "Active call"}${spouseLabel}`;
       document.getElementById("sheetSubheading").textContent =
         visit.clinical_reason || "Turn-by-turn spoken transcript and deterministic rule evaluation";
+
+      const recKey = encodeURIComponent(visit.session_id || visit.id || "demo");
+      const recUrl = `/api/recordings/${recKey}`;
+      const audioEl = document.getElementById("sheetCallAudio");
+      const dlEl = document.getElementById("sheetAudioDownload");
+      const metaEl = document.getElementById("sheetAudioMeta");
+      if (audioEl && audioEl.dataset.recKey !== recKey) {
+        audioEl.dataset.recKey = recKey;
+        audioEl.src = recUrl;
+      }
+      if (dlEl) {
+        dlEl.href = recUrl;
+        dlEl.download = `asha-vani-${recKey}.wav`;
+      }
+      if (metaEl) {
+        metaEl.textContent = `Session ${visit.session_id || visit.id} · 8 kHz full-call mix`;
+      }
 
       const turns = visit.turns || [];
       document.getElementById("turnCountLabel").textContent =
@@ -1991,12 +2003,13 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
             ? `<span class="tag tag--routine">${v.dispatch.label}</span>`
             : `<button class="btn btn--sm" type="button" onclick="event.stopPropagation(); openPatientModal('${v.id}')">Inspect / dispatch</button>`;
 
+          const spouseSub = v.patient_spouse ? `Husband: ${v.patient_spouse}, ` : "";
           return `
             <tr class="register-row ${isSelected ? "selected-row" : ""}" onclick="selectVisitRow('${v.id}')">
               <td>${getRiskBadge(v.risk_level)}</td>
               <td>
                 <div class="patient-name" onclick="openPatientModal('${v.id}')">${v.patient_name || "Unknown patient"}${v.patient_age ? ", " + v.patient_age + "y" : ""}</div>
-                <div class="patient-sub">${v.village || "Rampur"}, <span class="num">${v.asha_id || "ASHA-104"}</span></div>
+                <div class="patient-sub">${spouseSub}${v.village || "Rampur"}, <span class="num">${v.asha_id || "ASHA-104"}</span></div>
               </td>
               <td>${catTag}</td>
               <td>${weeksCell}</td>
@@ -2055,9 +2068,21 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
         )
         .join("");
 
+      const recKey = encodeURIComponent(visit.session_id || visit.id || "demo");
+      const recUrl = `/api/recordings/${recKey}`;
+
       document.getElementById("modalBody").innerHTML = `
         <div class="inspection-sheet">
           <div class="ruled-section-title">
+            <span>Full call audio recording</span>
+            <span class="num">${visit.session_id || visit.id}</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap;">
+            <audio controls preload="none" src="${recUrl}" style="height: 32px; flex: 1; min-width: 220px;"></audio>
+            <a class="btn btn--sm" href="${recUrl}" download="asha-vani-${recKey}.wav">Download audio</a>
+          </div>
+
+          <div class="ruled-section-title" style="margin-top: var(--space-xs);">
             <span>Clinical assessment &amp; recommended action</span>
             ${getRiskBadge(visit.risk_level)}
           </div>
@@ -2261,6 +2286,9 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     let playbackContext = null;
     let playbackCursor = 0;
     let playbackQueue = Promise.resolve();
+    let callMixDest = null;
+    let callMediaRecorder = null;
+    let callRecordedChunks = [];
     let ttsStreamActive = false;
     let ttsFailed = false;
     let pendingGreeting = "";
@@ -2302,8 +2330,10 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       const vals = p.visit_values || p.extracted_visit || {};
       if (p.asha_id || patient.asha_id) list.push(`Worker: ${p.asha_id || patient.asha_id}`);
       const pName = patient.full_name || patient.patient_name;
+      const pSpouse = patient.spouse_or_guardian_name || patient.patient_spouse;
       const pAge = patient.age_years ?? patient.patient_age;
       if (pName) list.push(`Patient: ${pName}${pAge ? " (" + pAge + "y)" : ""}`);
+      if (pSpouse) list.push(`Husband: ${pSpouse}`);
       const isPreg = p.is_pregnant !== undefined ? p.is_pregnant : vals.is_pregnant;
       if (isPreg === false) list.push("Non-pregnant");
       else if (vals.gestational_weeks != null) list.push(`${vals.gestational_weeks} weeks`);
@@ -2404,6 +2434,9 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       const valIssues = p.validation_issues || (p.validation_result && p.validation_result.issues) || [];
 
       if (patient.full_name || patient.patient_name) v.patient_name = patient.full_name || patient.patient_name;
+      if (patient.spouse_or_guardian_name || patient.patient_spouse) {
+        v.patient_spouse = patient.spouse_or_guardian_name || patient.patient_spouse;
+      }
       if ((patient.age_years ?? patient.patient_age) != null) v.patient_age = patient.age_years ?? patient.patient_age;
       if (patient.village) v.village = patient.village;
       if (p.asha_id || patient.asha_id) {
@@ -2486,6 +2519,24 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
         const response = await fetch("/api/register");
         if (!response.ok) return;
         const saved = await response.json();
+        for (const vRow of saved.visits || []) {
+          const sid = vRow.session_id || vRow.call_id || "saved";
+          const vNum = Number(vRow.visit_number || 1);
+          applyLiveBackendTurn(
+            sid,
+            {
+              visit_number: vNum,
+              patient: vRow.patient || {},
+              visit_values: vRow.visit_values || {},
+              triage: vRow.triage || {},
+              verification: vRow.verification || "UNVERIFIED",
+              utterance_seq: 1,
+              stt_transcript: (vRow.final_report && vRow.final_report.transcript) || "Saved visit record",
+              reply_text: (vRow.final_report && vRow.final_report.reply_text) || "",
+            },
+            vRow.updated_at
+          );
+        }
         for (const row of saved.events || []) {
           const evType = row.event_type;
           const sid = row.session_id;
@@ -2496,7 +2547,7 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
           } else if (evType === "turn_completed") {
             applyLiveBackendTurn(sid, payload, ts);
           } else if (evType === "call_ended") {
-            const visit = visits.find((v) => v.id === `live-${sid}` || v.session_id === sid);
+            const visit = visits.find((v) => v.id === `live-${sid}-1` || v.session_id === sid);
             if (visit && payload.final_verification === "INCOMPLETE") {
               visit.verification = "INCOMPLETE";
             }
@@ -2622,6 +2673,37 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       await micContext.resume();
       playbackContext = micContext;
       const source = micContext.createMediaStreamSource(micStream);
+      try {
+        callMixDest = micContext.createMediaStreamDestination();
+        source.connect(callMixDest);
+        callRecordedChunks = [];
+        if (typeof MediaRecorder !== "undefined") {
+          callMediaRecorder = new MediaRecorder(callMixDest.stream);
+          callMediaRecorder.ondataavailable = (ev) => {
+            if (ev.data && ev.data.size > 0) callRecordedChunks.push(ev.data);
+          };
+          callMediaRecorder.onstop = () => {
+            const sid = activeSessionId;
+            if (sid && callRecordedChunks.length > 0 && location.protocol !== "file:") {
+              const mimeType = callMediaRecorder?.mimeType || "audio/webm";
+              const blob = new Blob(callRecordedChunks, { type: mimeType });
+              fetch(`/api/recordings/${encodeURIComponent(sid)}`, {
+                method: "POST",
+                headers: { "Content-Type": mimeType },
+                body: blob,
+              })
+                .then(() => {
+                  const audioEl = document.getElementById("sheetCallAudio");
+                  if (audioEl && audioEl.dataset.recKey === sid) {
+                    audioEl.src = `/api/recordings/${encodeURIComponent(sid)}?t=${Date.now()}`;
+                  }
+                })
+                .catch(() => {});
+            }
+          };
+          callMediaRecorder.start(500);
+        }
+      } catch (_) {}
       micProcessor = micContext.createScriptProcessor(1024, 1, 1);
       micMuteGain = micContext.createGain();
       micMuteGain.gain.value = 0;
@@ -2648,6 +2730,11 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     }
 
     function stopLiveMicrophone() {
+      if (callMediaRecorder && callMediaRecorder.state !== "inactive") {
+        try { callMediaRecorder.stop(); } catch (_) {}
+      }
+      callMediaRecorder = null;
+      callMixDest = null;
       if (micProcessor) micProcessor.disconnect();
       if (micMuteGain) micMuteGain.disconnect();
       if (micStream) micStream.getTracks().forEach((track) => track.stop());
@@ -2673,6 +2760,9 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
           const source = playbackContext.createBufferSource();
           source.buffer = buffer;
           source.connect(playbackContext.destination);
+          if (callMixDest) {
+            try { source.connect(callMixDest); } catch (_) {}
+          }
           const startAt = Math.max(playbackContext.currentTime + 0.02, playbackCursor);
           source.start(startAt);
           playbackCursor = startAt + buffer.duration;
@@ -2801,15 +2891,17 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
               speakReplyHalfDuplex(msg.reply_text);
             }
           } else if (msg.type === "call_ended") {
-            endLiveCall();
+            const waitEndMs = playbackContext
+              ? Math.max(0, (playbackCursor - playbackContext.currentTime) * 1000) + 180
+              : 180;
+            setTimeout(() => endLiveCall(), waitEndMs);
           } else if (msg.type === "tts_start") {
             ttsFailed = false;
             ttsStreamActive = true;
             pauseMicForTTS();
             if (playbackContext) {
               playbackContext.resume().catch(() => {});
-              playbackCursor = playbackContext.currentTime + 0.04;
-              playbackQueue = Promise.resolve();
+              playbackCursor = Math.max(playbackCursor, playbackContext.currentTime + 0.04);
             }
           } else if (msg.type === "tts_end") {
             ttsStreamActive = false;
@@ -2897,26 +2989,6 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     });
 
     /* =====================================================================
-       SCRIPTED FIELD SCENARIOS (Runs Through Real Backend /api/turn)
-       ===================================================================== */
-    window.simulateScenario = function (kind) {
-      activeSessionId = null;
-      if (kind === "critical") {
-        sendUtteranceToBackend(
-          "Didi main ASHA 005 bol rahi hoon, Rampur se Radha Devi umar 25 saal, 34 hafte ki garbhvati hai, BP 164 by 112 hai, Hb 6.1 hai, tez sar dard aur dhundhla dikh raha hai"
-        );
-      } else if (kind === "nonpregnant") {
-        sendUtteranceToBackend(
-          "Mera ASHA ID 008 hai, Belwa se Savita Devi 31 saal, garbhvati nahi hai, BP 124/82 hai, Hb 5.8 hai aur bukhar hai"
-        );
-      } else if (kind === "garbled") {
-        sendUtteranceToBackend(
-          "ASHA 005, Rampur se Pooja Devi 22 saal, 28 hafte pregnant, BP 420 over 110 hai, Hb 9.5 hai, koi dikkat nahi"
-        );
-      }
-    };
-
-    /* =====================================================================
        INITIALIZATION & SUPABASE RECOVERY
        ===================================================================== */
     async function loadInitialState() {
@@ -2933,7 +3005,6 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
 
       renderRegister();
       connectConsoleWebSocket();
-      hydrateSavedRegister();
     }
 
     window.addEventListener("DOMContentLoaded", loadInitialState);
