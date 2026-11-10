@@ -98,6 +98,22 @@ class ExtractedVisit(ProjectModel):
         }
 
 
+class ConfirmationIntent(str, Enum):
+    """How the ASHA responded to the previous readback, if applicable."""
+
+    YES = "YES"
+    NO = "NO"
+    UNCLEAR = "UNCLEAR"
+
+
+class TurnExtraction(ProjectModel):
+    """Facts extracted from one utterance; contains no clinical assessment."""
+
+    patient: PatientReference = Field(default_factory=PatientReference)
+    visit: ExtractedVisit = Field(default_factory=ExtractedVisit)
+    confirmation_intent: ConfirmationIntent = ConfirmationIntent.UNCLEAR
+
+
 class ValidationIssue(ProjectModel):
     """One field-level finding from validation."""
 

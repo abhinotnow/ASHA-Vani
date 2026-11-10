@@ -48,7 +48,7 @@ flowchart LR
   end
 
   subgraph Logic["Person B: src/asha_vani/ (Core Logic)"]
-    Graph["graph.py (call_graph)\nmerge_turn -> validate -> triage\n-> ask_repeat | readback"]
+    Graph["graph.py (call_graph)\nextract -> merge -> validate -> triage\n-> collect | repeat | readback | confirm"]
     Val["validation.py\nHard/Soft Limits + BP Order"]
     Triage["triage.py\nDeterministic Rules R1-R8"]
     Schemas["schemas.py\nExtractedVisit · ValidationResult · TriageResult"]
@@ -72,11 +72,9 @@ flowchart LR
 
 ### 4.1 `TurnRunner` Bridge (`voice/turn_runner.py` ↔ `graph.py`)
 - `CallSession` calls `await turn_runner.run_turn(session_id, utterance_seq, transcript) -> TurnOutput`.
-- **Current status of `graph.py`:** `CallState` currently expects `extracted_turn: ExtractedVisit` (pre-extracted fixture) rather than extracting from `utterance: str`.
-- **Three integration items tracked between Person A's `TurnRunner` and Person B's `graph.py`:**
-  1. **LLM Extraction Node:** Until Person B adds the Groq extraction node into `graph.py`, `turn_runner.py` extracts `ExtractedVisit` + `PatientReference` from `transcript` and passes `extracted_turn` into `call_graph`.
-  2. **Confirmation Step (`UNVERIFIED` → `VERIFIED`):** When the ASHA replies *"Haan sahi hai"* after a readback, the visit verification status transitions from `PENDING_CONFIRMATION` (`UNVERIFIED`) to `COMMITTED_VERIFIED` (`VERIFIED`).
-  3. **Patient Identity (`PatientReference`):** Track `PatientReference` (`full_name`, `spouse_or_guardian_name`, `age_years`, `village`, `tola`) alongside `visit_values` so the PHC table row knows which patient the visit belongs to.
+- `LangGraphTurnRunner` passes the transcript to the graph with `thread_id=session_id`; extraction, patient/visit accumulation, validation, triage, follow-up prompts, and confirmation state live in the graph checkpoint.
+- The output shape remains `TurnOutput` so `CallSession` and existing turn events can consume it. `utterance_seq` remains available for event ordering/idempotency.
+- Current event names and payloads are a **draft**. Person A and Person B must approve them before treating them as a stable DB/API contract.
 
 ### 4.2 Edge-Case Invariants Enforced in Code
 1. **Half-Duplex Anti-Echo:** Drop all incoming mic frames while TTS is playing + **200 ms tail mute** after TTS completes.

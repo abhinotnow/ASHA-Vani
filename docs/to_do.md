@@ -1,0 +1,1 @@
+- maybe reach out to an actual doctor/some source online to verify if our schema is good? not super necessary for a demo but good to keep in mind.

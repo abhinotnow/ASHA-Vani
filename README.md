@@ -62,7 +62,18 @@ uv sync
 uv run pytest
 ```
 
-### 2. Run the Live Voice Server & 75/25 Nokia Simulator Workspace
+### 2. Configure live model and database services
+
+Copy `.env.example` to `.env` and add the Gnani and Groq API keys. To enable
+database persistence, also set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+The service-role key is backend-only; do not put it in browser code or commit
+`.env`.
+
+Apply `supabase/migrations/202611100001_initial_demo_persistence.sql` to the
+Supabase project (SQL Editor or Supabase CLI). Without database credentials,
+the call flow still runs but `/api/register` reports persistence as disabled.
+
+### 3. Run the Live Voice Server & 75/25 Nokia Simulator Workspace
 ```bash
 uv run asha-vani
 ```

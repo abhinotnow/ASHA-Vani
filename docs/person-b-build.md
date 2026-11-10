@@ -1,23 +1,20 @@
-# Person B: Logic, Data, and PHC Console
+# Person B: Logic, Data, and Integration Status
 
-See the [architecture plan](ASHA-Vani-architecture-and-plan%20(1).md) for full system details. This file summarizes Person B's work and next steps.
+See the [architecture plan](ASHA-Vani-architecture-and-plan%20(1).md) for clinical rules and full product scope.
 
 ## Built
 
-- `src/asha_vani/schemas.py`: shared models for extracted visit values, symptoms, validation findings, and triage results.
-- `src/asha_vani/validation.py`: hard/soft range checks, non-finite value rejection, and blood-pressure consistency checks. Rejected values are cleared from the returned copy.
-- `src/asha_vani/triage.py`: deterministic implementation of draft rules R1–R8; returns the highest level and all matching rule IDs.
-- `src/asha_vani/graph.py`: text-only turn flow; merges extracted data, validates, triages, and routes to repeat or readback using in-memory per-call state.
-- `tests/test_validation.py`, `tests/test_triage.py`: 50 tests covering rule behavior and boundaries; all pass.
+- Shared Pydantic models, hard/soft validation, and deterministic R1–R8 screening rules.
+- Async transcript extraction in `src/asha_vani/extraction.py`: Groq structured output, smaller-model fallback, then conservative deterministic extraction when providers fail or are unset.
+- LangGraph now owns per-call extraction state, merging/corrections, validation, triage, missing-field prompts, readback, and yes/no confirmation. `voice/turn_runner.py` is reduced to an adapter returning the existing `TurnOutput` shape.
+- Minimal Supabase event sink and migration for calls, latest visit snapshot, and call events. Server credentials stay backend-only; console reload uses `/api/register`.
+- Synthetic test coverage: **68 tests passed** on the current workspace.
 
-Clinical thresholds are drafts and need clinician review. Triage must receive the sanitized `ValidationResult.values`.
+## Still to do / coordinate
 
-## Next
+- Confirm `CallEvent` names/payload details and the adapter ownership change with Person A; current contract is a working draft.
+- Add `.env` credentials and apply `supabase/migrations/202611100001_initial_demo_persistence.sql`; database-backed behavior has not been checked against a live project.
+- Run the Prisma/Timbre path with real keys and tune VAD; browser speech recognition remains the fallback.
+- Get the draft triage rules reviewed by a clinician and report measured latency/extraction results only.
 
-1. Add transcript extraction, missing-field collection, and yes/correction handling to the graph.
-2. Agree event names, payloads, API actions, and database ownership with Person A.
-3. Add persistence/outbox and build the PHC console against the agreed API.
-
-## Team handoff
-
-The current graph input is a structured `extracted_turn` fixture, not raw transcript text. Agree the final transcript-in/reply-out payload and event contract before voice integration.
+All demo records must remain synthetic. Triage levels are screening support, not diagnoses; final referral decisions belong to PHC staff.

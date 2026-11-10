@@ -8,8 +8,10 @@ Pipeline Inspector update in real time.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
+from collections.abc import AsyncIterator
 from typing import Any
 import uuid
 
@@ -24,6 +26,8 @@ from asha_vani.voice.session import CallSession
 from asha_vani.voice.stt import GnaniPrismaSTT
 from asha_vani.voice.tts import FakeTTS, FixedScriptCache, GnaniTimbreTTS, TextToSpeech
 from asha_vani.voice.turn_runner import LangGraphTurnRunner
+from asha_vani.persistence import SupabaseEventSink
+from asha_vani.voice.audio import FRAME_BYTES
 
 load_dotenv()
 _SIMULATOR_HTML_PATH = Path(__file__).resolve().parent / "voice" / "simulator.html"
@@ -79,6 +83,53 @@ class WebSocketConsoleBroadcaster:
 broadcaster = WebSocketConsoleBroadcaster()
 shared_turn_runner = LangGraphTurnRunner(require_full_checklist=True)
 active_sessions: dict[str, CallSession] = {}
+supabase_sink: SupabaseEventSink | None = None
+if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
+    try:
+        supabase_sink = SupabaseEventSink(
+            os.environ["SUPABASE_URL"].strip(),
+            os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip(),
+        )
+    except Exception as exc:
+        # The text/voice demo can still run without persistence credentials.
+        import logging
+
+        logging.getLogger(__name__).exception("Supabase persistence is disabled: %s", exc)
+
+
+def _session_sinks() -> list[Any]:
+    sinks: list[Any] = [broadcaster]
+    if supabase_sink is not None:
+        sinks.append(supabase_sink)
+    return sinks
+
+
+class WebSocketTimbreStream:
+    """Stream raw 8 kHz PCM from Timbre to the active browser call socket."""
+
+    def __init__(self, ws: WebSocket) -> None:
+        self._ws = ws
+        self._client = GnaniTimbreTTS(
+            api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+            voice=os.getenv("GNANI_TTS_VOICE", "Poorvi"),
+            model="timbre-v2.5",
+            language=os.getenv("GNANI_TTS_LANG", "auto"),
+            sample_rate=8000,
+            container="raw",
+        )
+
+    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+        if not os.getenv("GNANI_API_KEY", "").strip():
+            await self._ws.send_json({"type": "tts_error", "message": "GNANI_API_KEY is not configured", "text": text})
+            return
+        await self._ws.send_json({"type": "tts_start", "sample_rate": 8000})
+        try:
+            async for chunk in self._client.synthesize(text):
+                await self._ws.send_bytes(chunk)
+                yield chunk
+            await self._ws.send_json({"type": "tts_end"})
+        except Exception as exc:
+            await self._ws.send_json({"type": "tts_error", "message": str(exc)[:200], "text": text})
 
 
 @app.get("/health")
@@ -88,7 +139,17 @@ async def health() -> dict[str, Any]:
         "gnani_configured": bool(os.getenv("GNANI_API_KEY", "").strip()),
         "active_calls": len(active_sessions),
         "console_clients": len(broadcaster.clients),
+        "supabase_configured": supabase_sink is not None,
     }
+
+
+@app.get("/api/register")
+async def load_register() -> dict[str, Any]:
+    """Return saved calls/turn events so the console can recover after refresh."""
+    if supabase_sink is None:
+        return {"configured": False, "visits": [], "events": []}
+    data = await supabase_sink.load_register()
+    return {"configured": True, **data}
 
 
 @app.get("/api/tts")
@@ -156,7 +217,7 @@ async def post_utterance_turn(req: UtteranceRequest) -> dict[str, Any]:
             caller=req.caller,
             turn_runner=shared_turn_runner,
             tts=FakeTTS(),
-            sinks=[broadcaster],
+            sinks=_session_sinks(),
         )
         active_sessions[sid] = session
         await session.start()
@@ -194,20 +255,15 @@ async def ws_console(ws: WebSocket) -> None:
 
 @app.websocket("/ws/call")
 async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+919900000001") -> None:
-    """Live call WebSocket for the Right 25% Nokia Simulator.
-
-    Accepts:
-    - Binary frames: 8 kHz 16-bit mono PCM audio (passed through `FrameBuffer` & half-duplex gate)
-    - JSON text frames: `{"type": "utterance", "text": "...", "stt_latency_ms": 135}` or `{"type": "hangup"}`
-    """
+    """Accept 8 kHz PCM16 for Prisma plus JSON utterances for replay/manual mode."""
     await ws.accept()
     sid = session_id or f"call-{uuid.uuid4().hex[:8]}"
     session = CallSession(
         sid,
         caller=caller,
         turn_runner=shared_turn_runner,
-        tts=FakeTTS(),
-        sinks=[broadcaster],
+        tts=WebSocketTimbreStream(ws),
+        sinks=_session_sinks(),
     )
     active_sessions[sid] = session
     await session.start()
@@ -218,14 +274,56 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
             "greeting_text": INITIAL_GREETING_HINGLISH,
         }
     )
+    async for _ in WebSocketTimbreStream(ws).synthesize(INITIAL_GREETING_HINGLISH):
+        pass
 
     end_reason = "DROPPED"
+    audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=100)
+
+    async def frames() -> AsyncIterator[bytes]:
+        while True:
+            frame = await audio_queue.get()
+            if frame is None:
+                return
+            yield frame
+
+    async def consume_prisma() -> None:
+        try:
+            prisma = GnaniPrismaSTT(
+                api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+                language_code=os.getenv("GNANI_STT_LANGUAGE", "hi-IN"),
+                sample_rate=8000,
+                format="transcribe",
+            )
+            async for chunk in prisma.stream(frames()):
+                turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
+                if turn is not None:
+                    await ws.send_json({
+                        "type": "turn_reply",
+                        "session_id": sid,
+                        "reply_text": turn.reply_text,
+                        "turn": turn.model_dump(mode="json"),
+                    })
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await ws.send_json({"type": "stt_error", "message": str(exc)[:200]})
+
+    prisma_task = asyncio.create_task(consume_prisma())
     try:
         while True:
             msg = await ws.receive()
             if msg.get("bytes") is not None:
-                # Condition & frame raw 8kHz PCM16 audio into exact 1024-byte frames
-                session.push_mic_audio(msg["bytes"])
+                # FrameBuffer yields exact 1,024-byte audio blocks for Prisma.
+                for frame in session.push_mic_audio(msg["bytes"]):
+                    if len(frame) != FRAME_BYTES:
+                        continue
+                    if audio_queue.full():
+                        try:
+                            audio_queue.get_nowait()  # discard stale audio under overload
+                        except asyncio.QueueEmpty:
+                            pass
+                    audio_queue.put_nowait(frame)
             elif msg.get("text") is not None:
                 import json
 
@@ -251,6 +349,15 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
     except WebSocketDisconnect:
         pass
     finally:
+        if audio_queue.full():
+            try:
+                audio_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+        audio_queue.put_nowait(None)
+        if not prisma_task.done():
+            prisma_task.cancel()
+        await asyncio.gather(prisma_task, return_exceptions=True)
         active_sessions.pop(sid, None)
         await session.end(reason=end_reason)
 

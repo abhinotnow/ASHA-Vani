@@ -2,6 +2,8 @@
 
 See the [architecture plan](ASHA-Vani-architecture-and-plan%20(1).md) for full details. Person A owns speech transport, `CallSession` orchestration, and the simulated caller experience.
 
+**Current status (Nov 10):** the live WebSocket path accepts browser PCM audio for Prisma and streams Timbre PCM audio back. Browser speech recognition/TTS remain fallbacks. Event names and payloads are a draft contract and still need Person A + Person B sign-off.
+
 ---
 
 ## 1. Call Flow
@@ -26,11 +28,11 @@ The graph owns conversation decisions. Audio streaming, buffering, playback, hal
 | # | Area | Decision | Why / Notes for Person B |
 |---|---|---|---|
 | **A1** | **Folder layout** | All Person A modules live under `src/asha_vani/voice/` (`audio.py`, `events.py`, `turn_runner.py`, `stt.py`, `tts.py`, `session.py`) + `src/asha_vani/server.py` at root. | Zero overlap with Person B's root files (`schemas.py`, `validation.py`, `triage.py`, `graph.py`) so we never hit merge conflicts. |
-| **A2** | **Graph handoff (`TurnRunner`)** | `CallSession` calls a thin `TurnRunner` protocol: `await run_turn(session_id, utterance_seq, transcript) -> TurnOutput` with an adapter wrapping `call_graph`. | Lets Person A test the full voice/session loop immediately while Person B finishes wiring the LLM extraction node in `graph.py`. Once `graph.py` accepts `utterance: str` directly, only the adapter changes. |
-| **A3** | **End-of-utterance detection** | **Natural pause** (~1.2s silence / Prisma end-of-speech event) **OR** spoken trigger word **`"over"`** at the end of a phrase (flushes turn immediately and strips `"over"` from the transcript). | Gives reliable turn boundaries in both quiet and noisy demos without cutting the ASHA off mid-sentence. |
+| **A2** | **Graph handoff (`TurnRunner`)** | `CallSession` calls a thin `TurnRunner` protocol: `await run_turn(session_id, utterance_seq, transcript) -> TurnOutput`. The adapter invokes the graph with the transcript and call `thread_id`. | The graph now owns extraction and conversation state; the adapter maps graph state into the existing `TurnOutput` shape. |
+| **A3** | **End-of-utterance detection** | Prisma final segments close turns using its VAD; the fallback browser-recognition path waits 5 seconds of silence or the spoken trigger **`"over"`**. | Prisma VAD tuning should be measured with demo speakers; the trigger remains useful in replay/manual mode. |
 | **A4** | **Half-duplex speaker control** | Strict half-duplex on the backend: while TTS audio is streaming to the caller, `CallSession` drops/mutes incoming mic frames + holds a **200 ms tail buffer** after playback ends. | Prevents the mic from picking up TTS speaker echo and triggering false self-interruptions. |
-| **A5** | **Audio conditioning & packages** | Use `numpy` + `scipy` + pure-Python/numpy G.711 mu-law codec (since Python 3.13 removed `audioop`). Both browser simulator and backend enforce **8 kHz, 16-bit mono PCM, 300–3400 Hz bandpass, mu-law round-trip, optional SNR noise (10 dB / 5 dB), and 1024-byte (64 ms) frames**. | Guarantees that live browser calls and offline WAV replay/benchmark runs go through the exact same telephone-grade pipeline. |
-| **A6** | **Turn-level events (`EventSink`)** | **No flickering live word-by-word partial transcripts on the dashboard.** `CallSession` emits structured turn-level events (`call_started`, `turn_completed`, `call_ended`) to registered async `EventSink` callbacks. | `CallSession` never imports Supabase directly. Right now sinks push to the live WebSocket and latency logger; Person B can attach a Supabase/outbox sink to the same hook with zero changes to `CallSession`. |
+| **A5** | **Audio conditioning & packages** | `audio.py` currently uses Python standard-library resampling/filtering, μ-law conversion, SNR mixing, and 1024-byte framing. Browser microphone audio is converted to 8 kHz mono PCM16 before streaming. | Keep the simulation conditioning distinct from any future real telephony codec adapter; no NumPy/SciPy dependency is currently required. |
+| **A6** | **Turn-level events (`EventSink`)** | **No flickering live word-by-word partial transcripts on the dashboard.** `CallSession` emits `call_started`, `turn_completed`, and `call_ended` events to async sinks. | The Supabase sink is attached at the server boundary. Treat these names/payloads as provisional until both teammates approve them. |
 
 ### 2.2 UI & Demo Workspace Layout (Shared with Person B)
 
@@ -98,7 +100,7 @@ Every event carries `session_id`, `seq`, `event_type`, `timestamp`, `is_simulate
      "validation_issues": [],
      "triage": {"level": "CRITICAL", "rules_fired": ["R2"]},
      "next_action": "CONFIRM_VALUES",
-     "verification": "PENDING_CONFIRMATION",
+     "verification": "UNVERIFIED",
      "reply_text": "Please confirm these details...",
      "latencies_ms": {"stt": 140.2, "graph": 310.5, "tts_first_byte": 95.0}
    }
@@ -107,18 +109,9 @@ Every event carries `session_id`, `seq`, `event_type`, `timestamp`, `is_simulate
 
 ---
 
-## 4. Step-by-Step Build Checklist (Person A)
+## 4. Remaining Checks (Person A + Shared)
 
-- [ ] **Step 1: Audio pipeline (`src/asha_vani/voice/audio.py` + `tests/test_audio.py`)**
-  - Add `numpy`, `scipy`, `jiwer` to `pyproject.toml`.
-  - Resampler to 8 kHz mono PCM16, 300–3400 Hz Butterworth bandpass filter, G.711 mu-law encode/decode round-trip, SNR noise mixer (10 dB / 5 dB), and 1024-byte (64 ms) frame chunker.
-- [ ] **Step 2: Events & TurnRunner contract (`src/asha_vani/voice/events.py`, `src/asha_vani/voice/turn_runner.py`)**
-  - Typed `CallEvent`, `EventSink` protocol, in-memory/WebSocket broadcaster, and `LangGraphTurnRunner` adapter wrapping Person B's `call_graph`.
-- [ ] **Step 3: STT & TTS interfaces + Fakes + End-of-Utterance detector (`src/asha_vani/voice/stt.py`, `src/asha_vani/voice/tts.py`)**
-  - Streaming STT/TTS protocols, pause + `"over"` end-of-utterance detector, fixed prompt audio cache, and fake STT/TTS for deterministic tests & load testing.
-- [ ] **Step 4: `CallSession` orchestrator (`src/asha_vani/voice/session.py` + `tests/test_session.py`)**
-  - Ordered turn queue, half-duplex speaker gate (+ 200 ms tail mute), concurrency semaphores, dropped-call handling, and per-stage latency logging.
-- [ ] **Step 5: Gnani Prisma STT & Timbre TTS live clients**
-  - Implement against verified Gnani API docs (headers, events, audio framing).
-- [ ] **Step 6: FastAPI server + 75/25 Split Demo Workspace (`src/asha_vani/server.py`, `tools/replay.py`)**
-  - `/ws/call`, `/ws/console`, `/simulator` with the 75% Database + Slide-Over Turn Inspector and 25% Nokia Feature-Phone Simulator + Demo Controls.
+- [ ] Run browser PCM → Prisma → graph → Timbre with real Gnani keys; tune VAD using representative demo speech.
+- [ ] Approve the event and payload draft with Person B before treating persisted records or dashboard behavior as stable.
+- [ ] Apply the initial Supabase migration and confirm console reload from saved calls and events.
+- [ ] Measure per-stage latency and extraction/rule outcomes; keep thresholds labeled as draft until clinician review.

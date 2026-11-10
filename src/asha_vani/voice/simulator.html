@@ -1406,12 +1406,116 @@
     let activeAudio = null;
     let callTimerInterval = null;
     let callSeconds = 0;
+    let micStream = null;
+    let micContext = null;
+    let micProcessor = null;
+    let micMuteGain = null;
+    let playbackContext = null;
+    let playbackCursor = 0;
+    let playbackQueue = Promise.resolve();
+    let ttsStreamActive = false;
+    let ttsFailed = false;
+    let pendingGreeting = "";
     const SILENCE_WAIT_MS = 5000; // Wait 5.0 full seconds of silence (or say/click 'OVER') so ASHA can think & speak slowly
 
     function formatTimer(sec) {
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
       const s = String(sec % 60).padStart(2, "0");
       return `${m}:${s}`;
+    }
+
+    async function startLiveMicrophone() {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone capture is unavailable");
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false } });
+      micContext = new AudioContext({ sampleRate: 8000 });
+      await micContext.resume();
+      playbackContext = micContext;
+      const source = micContext.createMediaStreamSource(micStream);
+      micProcessor = micContext.createScriptProcessor(1024, 1, 1);
+      micMuteGain = micContext.createGain();
+      micMuteGain.gain.value = 0;
+      micProcessor.onaudioprocess = (event) => {
+        if (!isCallActive || isHalfDuplexMuted || !callWs || callWs.readyState !== WebSocket.OPEN) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const ratio = micContext.sampleRate / 8000;
+        const outputLength = Math.max(1, Math.floor(input.length / ratio));
+        const pcm = new ArrayBuffer(outputLength * 2);
+        const view = new DataView(pcm);
+        for (let i = 0; i < outputLength; i++) {
+          const sourcePosition = i * ratio;
+          const left = Math.floor(sourcePosition);
+          const blend = sourcePosition - left;
+          const right = Math.min(input.length - 1, left + 1);
+          const sample = Math.max(-1, Math.min(1, input[left] * (1 - blend) + input[right] * blend));
+          view.setInt16(i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
+        }
+        callWs.send(pcm);
+      };
+      source.connect(micProcessor);
+      micProcessor.connect(micMuteGain);
+      micMuteGain.connect(micContext.destination);
+    }
+
+    function stopLiveMicrophone() {
+      if (micProcessor) micProcessor.disconnect();
+      if (micMuteGain) micMuteGain.disconnect();
+      if (micStream) micStream.getTracks().forEach(track => track.stop());
+      if (micContext && micContext !== playbackContext) micContext.close().catch(() => {});
+      micProcessor = null;
+      micMuteGain = null;
+      micStream = null;
+      micContext = null;
+    }
+
+    function schedulePcmPlayback(blob) {
+      if (!playbackContext) return;
+      playbackQueue = playbackQueue.then(() => blob.arrayBuffer()).then((raw) => {
+        const usableBytes = raw.byteLength - (raw.byteLength % 2);
+        if (!usableBytes) return;
+        const view = new DataView(raw, 0, usableBytes);
+        const samples = usableBytes / 2;
+        const buffer = playbackContext.createBuffer(1, samples, 8000);
+        const channel = buffer.getChannelData(0);
+        for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
+        const source = playbackContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(playbackContext.destination);
+        const startAt = Math.max(playbackContext.currentTime + 0.02, playbackCursor);
+        source.start(startAt);
+        playbackCursor = startAt + buffer.duration;
+      }).catch((err) => console.warn("Timbre audio chunk failed:", err));
+    }
+
+    function startBrowserSpeechFallback() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec || recognition) return;
+      recognition = new SpeechRec();
+      recognition.lang = "en-IN";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        if (isHalfDuplexMuted || !isCallActive) return;
+        clearTimeout(silenceDebounceTimer);
+        let currentInterim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const phrase = event.results[i][0].transcript;
+          if (event.results[i].isFinal) accumulatedSpeech = (accumulatedSpeech + " " + phrase).trim();
+          else currentInterim += phrase;
+        }
+        interimSpeech = currentInterim.trim();
+        const preview = (accumulatedSpeech + " " + interimSpeech).trim();
+        if (preview) lcdSub.textContent = `Mic: "${preview}"`;
+        if (/\b(over|ओवर)\s*[.,!?]*$/i.test(preview)) sendUtteranceToBackend(preview);
+        else if (preview) silenceDebounceTimer = setTimeout(() => {
+          const text = (accumulatedSpeech + " " + interimSpeech).trim();
+          if (text && !isHalfDuplexMuted && isCallActive) sendUtteranceToBackend(text);
+        }, SILENCE_WAIT_MS);
+      };
+      recognition.onerror = () => {};
+      recognition.onend = () => {
+        if (isCallActive && !isHalfDuplexMuted) try { recognition.start(); } catch (_) {}
+      };
+      try { recognition.start(); } catch (_) {}
     }
 
     function connectConsoleWebSocket() {
@@ -1421,6 +1525,7 @@
       }
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       consoleWs = new WebSocket(`${proto}//${location.host}/ws/console`);
+      consoleWs.onopen = hydrateSavedRegister;
       consoleWs.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
@@ -1436,6 +1541,38 @@
       consoleWs.onclose = () => {
         setTimeout(connectConsoleWebSocket, 1500);
       };
+    }
+
+    async function hydrateSavedRegister() {
+      try {
+        const response = await fetch("/api/register");
+        if (!response.ok) return;
+        const saved = await response.json();
+        for (const row of (saved.events || [])) {
+          const event = {
+            session_id: row.session_id,
+            event_type: row.event_type,
+            timestamp: row.occurred_at,
+            payload: row.payload || {}
+          };
+          if (event.event_type === "call_started") {
+            ensureLiveVisitStarted(event.session_id, event.timestamp);
+          } else if (event.event_type === "turn_completed") {
+            applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
+          } else if (event.event_type === "call_ended") {
+            const visit = visits.find(v => v.id === `live-${event.session_id}`);
+            if (visit) {
+              visit.isLive = false;
+              if (event.payload?.final_verification === "INCOMPLETE") {
+                visit.verification = "INCOMPLETE";
+              }
+            }
+          }
+        }
+        renderTable();
+      } catch (err) {
+        console.warn("Saved register could not be loaded:", err);
+      }
     }
 
     function ensureLiveVisitStarted(sessionId, eventIsoTime = null) {
@@ -1709,73 +1846,64 @@
         lcdTimer.textContent = formatTimer(callSeconds);
       }, 1000);
 
-      // Set up browser speech recognition in 'en-IN' (captures Hindi + English speech in Roman/English script!)
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRec) {
-        recognition = new SpeechRec();
-        recognition.lang = "en-IN";
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onresult = (event) => {
-          if (isHalfDuplexMuted || !isCallActive) return;
-          clearTimeout(silenceDebounceTimer);
-
-          let currentInterim = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const phrase = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              accumulatedSpeech = (accumulatedSpeech + " " + phrase).trim();
-            } else {
-              currentInterim += phrase;
-            }
-          }
-          interimSpeech = currentInterim.trim();
-          const fullPreview = (accumulatedSpeech + " " + interimSpeech).trim();
-          if (fullPreview) {
-            lcdSub.textContent = `Mic: "${fullPreview}"`;
-          }
-
-          // Flush immediately if user says "over", else wait 5.0 seconds of silence
-          if (/\b(over|ओवर)\s*[.,!?]*$/i.test(fullPreview)) {
-            sendUtteranceToBackend(fullPreview);
-          } else if (fullPreview) {
-            silenceDebounceTimer = setTimeout(() => {
-              const toSend = (accumulatedSpeech + " " + interimSpeech).trim();
-              if (toSend && !isHalfDuplexMuted && isCallActive) {
-                sendUtteranceToBackend(toSend);
-              }
-            }, SILENCE_WAIT_MS);
-          }
-        };
-        recognition.onerror = () => {};
-        recognition.onend = () => {
-          if (isCallActive && !isHalfDuplexMuted) {
-            try { recognition.start(); } catch (_) {}
-          }
-        };
-      }
-
       if (location.protocol !== "file:") {
         const proto = location.protocol === "https:" ? "wss:" : "ws:";
         callWs = new WebSocket(`${proto}//${location.host}/ws/call`);
+        callWs.binaryType = "blob";
         callWs.onmessage = (ev) => {
+          if (typeof ev.data !== "string") {
+            if (ttsStreamActive) schedulePcmPlayback(ev.data);
+            return;
+          }
           const msg = JSON.parse(ev.data);
           if (msg.type === "call_started") {
             activeSessionId = msg.session_id;
+            pendingGreeting = msg.greeting_text || "";
             ensureLiveVisitStarted(msg.session_id);
-            // Speak the initial Hinglish greeting first, then open mic when done!
-            speakReplyHalfDuplex(
-              msg.greeting_text ||
-              "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
-            );
           } else if (msg.type === "turn_reply") {
             if (msg.turn) {
               applyLiveBackendTurn(msg.session_id || activeSessionId, msg.turn);
             }
-            speakReplyHalfDuplex(msg.reply_text);
+            if (ttsFailed) {
+              ttsFailed = false;
+              speakReplyHalfDuplex(msg.reply_text);
+            }
+          } else if (msg.type === "tts_start") {
+            ttsFailed = false;
+            ttsStreamActive = true;
+            pauseMicForTTS();
+            if (playbackContext) {
+              playbackContext.resume().catch(() => {});
+              playbackCursor = playbackContext.currentTime + 0.04;
+              playbackQueue = Promise.resolve();
+            }
+          } else if (msg.type === "tts_end") {
+            ttsStreamActive = false;
+            pendingGreeting = "";
+            playbackQueue.finally(() => {
+              const waitMs = playbackContext
+                ? Math.max(0, (playbackCursor - playbackContext.currentTime) * 1000) + 100
+                : 100;
+              setTimeout(() => { if (isCallActive) resumeMicAfterTTS(); }, waitMs);
+            });
+          } else if (msg.type === "tts_error") {
+            ttsStreamActive = false;
+            ttsFailed = true;
+            if (pendingGreeting) {
+              const greeting = pendingGreeting;
+              pendingGreeting = "";
+              speakReplyHalfDuplex(greeting);
+            }
+          } else if (msg.type === "stt_error") {
+            console.warn("Prisma stream unavailable; using browser speech recognition:", msg.message);
+            stopLiveMicrophone();
+            startBrowserSpeechFallback();
           }
         };
+        startLiveMicrophone().catch((err) => {
+          console.warn("Microphone streaming unavailable; using browser speech recognition:", err);
+          startBrowserSpeechFallback();
+        });
       } else {
         speakReplyHalfDuplex(
           "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
@@ -1797,6 +1925,12 @@
         activeAudio = null;
       }
       if (window.speechSynthesis) window.speechSynthesis.cancel();
+      stopLiveMicrophone();
+      if (playbackContext) {
+        playbackContext.close().catch(() => {});
+        playbackContext = null;
+      }
+      playbackQueue = Promise.resolve();
       if (callWs && callWs.readyState === WebSocket.OPEN) {
         callWs.send(JSON.stringify({ type: "hangup" }));
         callWs.close();
