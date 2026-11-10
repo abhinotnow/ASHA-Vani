@@ -147,3 +147,18 @@ class TriageResult(ProjectModel):
 
     level: TriageLevel
     rules_fired: list[str] = Field(default_factory=list)
+
+
+class FinalVisitReport(ProjectModel):
+    """Persisted, human-readable summary for one completed patient visit."""
+
+    session_id: str
+    visit_number: int = 1
+    patient_id: str | None = None
+    patient: PatientReference
+    visit_values: ExtractedVisit
+    triage: TriageResult
+    validation_issues: list[ValidationIssue] = Field(default_factory=list)
+    verification: str
+    recorded_at: str
+    is_simulated: bool = True

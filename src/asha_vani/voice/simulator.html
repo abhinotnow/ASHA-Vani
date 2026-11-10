@@ -910,6 +910,7 @@
               <option value="ALL">Status: All</option>
               <option value="UNVERIFIED">Unverified (In Call)</option>
               <option value="VERIFIED">Verified</option>
+              <option value="INCOMPLETE">Incomplete</option>
             </select>
           </div>
 
@@ -1243,7 +1244,7 @@
             </td>
             <td>
               <span class="verify-badge verify-${v.verification}">
-                ${v.verification === "UNVERIFIED" ? "UNVERIFIED (In Call)" : "VERIFIED"}
+                ${v.verification === "UNVERIFIED" ? "UNVERIFIED (In Call)" : v.verification}
               </span>
             </td>
             <td onclick="event.stopPropagation()">
@@ -1320,10 +1321,24 @@
         </div>
       `).join("") : `<div class="turn-card" style="color: var(--text-muted); font-size: 12px;">Live call connected — waiting for Turn #1 (speak into mic or click OVER ↵)...</div>`;
 
+      const priorVisits = v.patientId
+        ? visits.filter(item => item.patientId === v.patientId && item.id !== v.id && item.verification === "VERIFIED")
+        : [];
+      const historyHtml = priorVisits.length ? `
+        <div>
+          <div class="section-heading"><span>Previous Verified Visits</span><span>${priorVisits.length}</span></div>
+          ${priorVisits.map(item => `
+            <div class="turn-card">
+              <div class="turn-head"><span>${item.recordedAt}</span><span class="triage-badge triage-${item.triage}">${item.triage}</span></div>
+              <div class="step-row"><span class="step-tag">VISIT ${item.visitNumber || "—"}</span>
+                <span class="step-val">${item.weeks ?? "—"} weeks · BP ${item.bp_sys ?? "—"}/${item.bp_dia ?? "—"} · Hb ${item.hb ?? "—"}</span></div>
+            </div>`).join("")}
+        </div>` : "";
+
       drawerBody.innerHTML = `
         <div>
           <div class="section-heading">
-            <span>Sanitized Register Vitals</span>
+            <span>Final Visit Report · ${v.verification}</span>
             <span class="triage-badge triage-${v.triage}">${v.triage} ${v.rules.length ? "(" + v.rules.join(", ") + ")" : ""}</span>
           </div>
           <div class="vitals-grid">
@@ -1343,15 +1358,14 @@
           <div class="symptom-chips">${symptomsHtml}</div>
         </div>
 
-        <div>
-          <div class="section-heading">
-            <span>Step-by-Step Voice & Rule Pipeline Log</span>
-            <span style="font-family: var(--font-mono); font-size: 10px;">LLM extracts · Code decides</span>
-          </div>
+        ${historyHtml}
+
+        <details>
+          <summary class="section-heading" style="cursor: pointer;">Voice & Rule Pipeline Details · ${v.turns.length} turns</summary>
           <div style="display: flex; flex-direction: column; gap: 10px;">
             ${turnsHtml}
           </div>
-        </div>
+        </details>
       `;
     }
 
@@ -1529,10 +1543,17 @@
       consoleWs.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
-          if (event.event_type === "call_started" && event.session_id === activeSessionId) {
+          if (event.event_type === "call_started") {
             ensureLiveVisitStarted(event.session_id, event.timestamp);
           } else if (event.event_type === "turn_completed") {
             applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
+          } else if (event.event_type === "call_ended") {
+            for (const visit of visits.filter(v => v.sessionId === event.session_id)) {
+              visit.isLive = false;
+              if (Number(visit.visitNumber || 1) === Number(event.payload?.visit_number || 1)
+                  && event.payload?.final_verification === "INCOMPLETE") visit.verification = "INCOMPLETE";
+            }
+            renderTable();
           }
         } catch (err) {
           console.warn("Console WS parse error:", err);
@@ -1548,26 +1569,13 @@
         const response = await fetch("/api/register");
         if (!response.ok) return;
         const saved = await response.json();
-        for (const row of (saved.events || [])) {
-          const event = {
-            session_id: row.session_id,
-            event_type: row.event_type,
-            timestamp: row.occurred_at,
-            payload: row.payload || {}
-          };
-          if (event.event_type === "call_started") {
-            ensureLiveVisitStarted(event.session_id, event.timestamp);
-          } else if (event.event_type === "turn_completed") {
-            applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
-          } else if (event.event_type === "call_ended") {
-            const visit = visits.find(v => v.id === `live-${event.session_id}`);
-            if (visit) {
-              visit.isLive = false;
-              if (event.payload?.final_verification === "INCOMPLETE") {
-                visit.verification = "INCOMPLETE";
-              }
-            }
-          }
+        if (saved.available === false) return;
+        if (saved.configured && Array.isArray(saved.visits)) {
+          const events = saved.events || [];
+          const calls = new Map((saved.calls || []).map(call => [call.session_id, call]));
+          const reports = saved.visits.map(row => savedRowToVisit(row, events, calls));
+          // Once persistence is configured, saved visit reports are the register source of truth.
+          visits.splice(0, visits.length, ...reports);
         }
         renderTable();
       } catch (err) {
@@ -1575,14 +1583,72 @@
       }
     }
 
+    function savedRowToVisit(row, eventRows, calls) {
+      const report = row.final_report || {};
+      const patient = report.patient || row.patient || {};
+      const values = report.visit_values || row.visit_values || {};
+      const triage = report.triage || row.triage || {};
+      const sessionId = row.session_id;
+      const visitNumber = Number(row.visit_number || 1);
+      const call = calls.get(sessionId) || {};
+      const turns = eventRows.filter(event => event.event_type === "turn_completed"
+        && event.session_id === sessionId
+        && Number(event.payload?.visit_number || 1) === visitNumber).map(event => {
+          const payload = event.payload || {};
+          const turnPatient = payload.patient || patient;
+          const turnValues = payload.visit_values || values;
+          const turnTriage = payload.triage || triage;
+          return {
+            seq: payload.utterance_seq,
+            timestamp: formatNowTimestamp(event.occurred_at),
+            what_happened: describeWhatHappened(payload, turnPatient, turnValues, turnTriage),
+            stt: payload.stt_transcript || "",
+            stt_ms: payload.latencies_ms?.stt ?? 0,
+            llm_json: { patient: turnPatient, extracted_turn: payload.extracted_turn || {} },
+            llm_ms: payload.latencies_ms?.graph ?? 0,
+            validation: (payload.validation_issues || []).map(issue => `${issue.severity}: ${issue.message}`).join(" | ") || "PASS",
+            triage_decision: `${turnTriage.level || "ROUTINE"} · ${(turnTriage.rules_fired || []).join(", ") || "no rules"}`,
+            tts_reply: payload.reply_text || ""
+          };
+        });
+      return {
+        id: `saved-${sessionId}-${visitNumber}`,
+        sessionId,
+        visitNumber,
+        patientId: row.patient_id || report.patient_id || null,
+        isLive: false,
+        recordedAt: formatNowTimestamp(row.finalized_at || row.updated_at),
+        whatHappened: `Visit ${visitNumber} · ${call.source || "CALL"} · ${row.verification}`,
+        name: patient.full_name || "Unknown patient",
+        spouse: patient.spouse_or_guardian_name || "—",
+        age: patient.age_years ?? "—",
+        village: patient.village || "—",
+        tola: patient.tola || "—",
+        asha: call.caller || "ASHA caller",
+        weeks: values.gestational_weeks ?? null,
+        bp_sys: values.bp_systolic ?? null,
+        bp_dia: values.bp_diastolic ?? null,
+        hb: values.hb_g_dl ?? null,
+        symptoms: (values.symptoms || []).filter(item => item.presence === "PRESENT").map(item => item.code),
+        triage: triage.level || "ROUTINE",
+        rules: triage.rules_fired || [],
+        verification: row.verification || "UNVERIFIED",
+        actionStatus: "PENDING",
+        turns
+      };
+    }
+
     function ensureLiveVisitStarted(sessionId, eventIsoTime = null) {
       if (!sessionId) return;
-      const vid = `live-${sessionId}`;
+      const vid = `live-${sessionId}-1`;
       let visit = visits.find(v => v.id === vid);
       const formattedTime = formatNowTimestamp(eventIsoTime);
       if (!visit) {
         visit = {
           id: vid,
+          sessionId,
+          visitNumber: 1,
+          patientId: null,
           isLive: true,
           recordedAt: formattedTime,
           whatHappened: "Call Connected → Asking for Patient Name & Village",
@@ -1633,7 +1699,8 @@
 
     function applyLiveBackendTurn(sessionId, payload, eventIsoTime = null) {
       if (!sessionId || !payload) return;
-      const vid = `live-${sessionId}`;
+      const visitNumber = Number(payload.visit_number || 1);
+      const vid = `live-${sessionId}-${visitNumber}`;
       let visit = visits.find(v => v.id === vid);
       const patient = payload.patient || {};
       const vals = payload.visit_values || {};
@@ -1667,6 +1734,9 @@
       if (!visit) {
         visit = {
           id: vid,
+          sessionId,
+          visitNumber,
+          patientId: payload.matched_patient_id || null,
           isLive: true,
           recordedAt: formattedTime,
           whatHappened: summaryText,
@@ -1705,6 +1775,7 @@
         visit.triage = triage.level;
         visit.rules = triage.rules_fired || [];
         visit.verification = payload.verification || visit.verification;
+        if (payload.matched_patient_id) visit.patientId = payload.matched_patient_id;
         const existingIdx = visit.turns.findIndex(t => t.seq === turnEntry.seq);
         if (existingIdx === -1) {
           visit.turns.push(turnEntry);

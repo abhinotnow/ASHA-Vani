@@ -48,3 +48,37 @@ def test_critical_symptom_is_not_hidden_by_invalid_bp_repeat(monkeypatch) -> Non
         assert "PHC team" in result.reply_text
 
     asyncio.run(scenario())
+
+
+def test_verified_visits_can_repeat_in_one_call_then_end(monkeypatch) -> None:
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    async def scenario() -> None:
+        runner = LangGraphTurnRunner(require_full_checklist=True)
+        first = await runner.run_turn(
+            "multi-call", 1,
+            "Pooja Devi Rampur pati Ramesh Kumar 32 weeks BP 120 by 80 Hb 11.2 koi takleef nahi",
+        )
+        assert first.next_action == "CONFIRM_VALUES"
+        first_confirmed = await runner.run_turn("multi-call", 2, "Haan sahi hai")
+        assert first_confirmed.verification is VerificationStatus.VERIFIED
+        assert first_confirmed.next_action == "ASK_ANOTHER_PATIENT"
+
+        next_visit = await runner.run_turn("multi-call", 3, "Haan")
+        assert next_visit.visit_number == 2
+        assert next_visit.next_action == "ASK_PATIENT_NAME"
+
+        second = await runner.run_turn(
+            "multi-call", 4,
+            "Kavita Devi Belwa pati Sanjay Mahto 28 weeks BP 118 by 76 Hb 10.5 koi takleef nahi",
+        )
+        assert second.visit_number == 2
+        assert second.next_action == "CONFIRM_VALUES"
+        second_confirmed = await runner.run_turn("multi-call", 5, "Haan sahi hai")
+        assert second_confirmed.verification is VerificationStatus.VERIFIED
+        end = await runner.run_turn("multi-call", 6, "Nahi")
+        assert end.next_action == "END_CALL"
+        assert end.call_complete is True
+        assert end.visit_number == 2
+
+    asyncio.run(scenario())

@@ -177,7 +177,7 @@ def test_call_session_end_to_end_turn_flow_and_edge_cases() -> None:
         assert t2 is not None
         assert t2.is_confirmation_turn is True
         assert t2.verification is VerificationStatus.VERIFIED
-        assert t2.next_action == "COMMITTED_VERIFIED"
+        assert t2.next_action == "ASK_ANOTHER_PATIENT"
 
         await session.end(reason="COMPLETED")
 
@@ -191,6 +191,20 @@ def test_call_session_end_to_end_turn_flow_and_edge_cases() -> None:
         assert sink.events[-1].payload["final_verification"] == "VERIFIED"
 
     asyncio.run(_run())
+
+
+def test_ending_with_unconfirmed_visit_marks_it_incomplete() -> None:
+    async def scenario() -> None:
+        sink = InMemoryEventSink()
+        session = CallSession("unfinished", turn_runner=LangGraphTurnRunner(), sinks=[sink])
+        await session.start()
+        out = await session.process_utterance("Pooja Devi Rampur BP 150 by 95")
+        assert out is not None
+        assert out.verification is VerificationStatus.UNVERIFIED
+        ended = await session.end(reason="COMPLETED")
+        assert ended.payload["final_verification"] == "INCOMPLETE"
+
+    asyncio.run(scenario())
 
 
 def test_call_session_safe_refusal_on_hard_invalid_bp_and_dropped_call() -> None:
@@ -316,7 +330,7 @@ def test_step_by_step_full_checklist_flow(monkeypatch) -> None:
         assert t6 is not None
         assert t6.is_confirmation_turn is True
         assert t6.verification is VerificationStatus.VERIFIED
-        assert t6.next_action == "COMMITTED_VERIFIED"
+        assert t6.next_action == "ASK_ANOTHER_PATIENT"
 
     asyncio.run(_run_checklist())
 

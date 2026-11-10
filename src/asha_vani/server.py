@@ -9,6 +9,7 @@ Pipeline Inspector update in real time.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 from collections.abc import AsyncIterator
@@ -28,8 +29,18 @@ from asha_vani.voice.tts import FakeTTS, FixedScriptCache, GnaniTimbreTTS, TextT
 from asha_vani.voice.turn_runner import LangGraphTurnRunner
 from asha_vani.persistence import SupabaseEventSink
 from asha_vani.voice.audio import FRAME_BYTES
+from asha_vani.voice.exotel import (
+    ExotelMediaChunker,
+    ExotelProtocolError,
+    ExotelTTSStream,
+    build_exotel_stream_url,
+    decode_exotel_media,
+    parse_exotel_message,
+    verify_exotel_basic_auth,
+)
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 _SIMULATOR_HTML_PATH = Path(__file__).resolve().parent / "voice" / "simulator.html"
 
 # In-memory WAV cache so identical prompts (greeting, follow-ups, repeats) cost 0 extra Gnani credits
@@ -58,11 +69,6 @@ class WebSocketConsoleBroadcaster:
     async def connect(self, ws: WebSocket) -> None:
         await ws.accept()
         self.clients.add(ws)
-        for past_event in self.history[-50:]:
-            try:
-                await ws.send_json(past_event)
-            except Exception:
-                pass
 
     def disconnect(self, ws: WebSocket) -> None:
         self.clients.discard(ws)
@@ -81,7 +87,6 @@ class WebSocketConsoleBroadcaster:
 
 
 broadcaster = WebSocketConsoleBroadcaster()
-shared_turn_runner = LangGraphTurnRunner(require_full_checklist=True)
 active_sessions: dict[str, CallSession] = {}
 supabase_sink: SupabaseEventSink | None = None
 if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
@@ -95,6 +100,11 @@ if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KE
         import logging
 
         logging.getLogger(__name__).exception("Supabase persistence is disabled: %s", exc)
+
+shared_turn_runner = LangGraphTurnRunner(
+    require_full_checklist=True,
+    history_lookup=supabase_sink.find_patient_history if supabase_sink is not None else None,
+)
 
 
 def _session_sinks() -> list[Any]:
@@ -134,22 +144,37 @@ class WebSocketTimbreStream:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip()
+    try:
+        exotel_stream_url = build_exotel_stream_url(public_base_url) if public_base_url else None
+    except ValueError:
+        exotel_stream_url = None
     return {
         "ok": True,
         "gnani_configured": bool(os.getenv("GNANI_API_KEY", "").strip()),
         "active_calls": len(active_sessions),
         "console_clients": len(broadcaster.clients),
         "supabase_configured": supabase_sink is not None,
+        "exotel_configured": all(os.getenv(key, "").strip() for key in (
+            "EXOTEL_API_KEY", "EXOTEL_API_TOKEN", "EXOTEL_ACCOUNT_SID",
+            "EXOTEL_EXOPHONE", "PUBLIC_BASE_URL",
+        )),
+        "exotel_stream_url": exotel_stream_url,
     }
 
 
 @app.get("/api/register")
 async def load_register() -> dict[str, Any]:
-    """Return saved calls/turn events so the console can recover after refresh."""
+    """Return saved final visit reports and call history for console hydration."""
     if supabase_sink is None:
         return {"configured": False, "visits": [], "events": []}
-    data = await supabase_sink.load_register()
-    return {"configured": True, **data}
+    try:
+        data = await supabase_sink.load_register()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Saved register could not be loaded")
+        return {"configured": True, "available": False, "visits": [], "events": [], "calls": []}
+    return {"configured": True, "available": True, **data}
 
 
 @app.get("/api/tts")
@@ -343,6 +368,10 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                                 "turn": out.model_dump(mode="json"),
                             }
                         )
+                        if out.next_action == "END_CALL":
+                            end_reason = "COMPLETED"
+                            await ws.send_json({"type": "call_ended", "session_id": sid, "reason": "COMPLETED"})
+                            break
                 elif mtype == "hangup":
                     end_reason = "COMPLETED"
                     break
@@ -360,4 +389,215 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
         await asyncio.gather(prisma_task, return_exceptions=True)
         active_sessions.pop(sid, None)
         await session.end(reason=end_reason)
+        if end_reason == "COMPLETED":
+            try:
+                await ws.close(code=1000)
+            except Exception:
+                pass
+
+
+def _exotel_start_value(start: dict[str, Any], *keys: str) -> str | None:
+    for container in (start, start.get("custom_parameters", {}), start.get("customParameters", {})):
+        if isinstance(container, dict):
+            for key in keys:
+                value = container.get(key)
+                if value:
+                    return str(value)
+    return None
+
+
+@app.websocket("/ws/exotel")
+async def ws_exotel(ws: WebSocket) -> None:
+    """Bridge Exotel AgentStream's JSON/base64 PCM to the shared call session."""
+    if not verify_exotel_basic_auth(
+        ws.headers.get("authorization"),
+        os.getenv("EXOTEL_API_KEY", "").strip(),
+        os.getenv("EXOTEL_API_TOKEN", "").strip(),
+    ):
+        await ws.close(code=4401, reason="Unauthorized")
+        return
+    await ws.accept()
+    stream_sid: str | None = None
+    session: CallSession | None = None
+    tts: ExotelTTSStream | None = None
+    audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=200)
+    prisma_task: asyncio.Task[None] | None = None
+    greeting_task: asyncio.Task[None] | None = None
+    call_done = asyncio.Event()
+    call_failed = asyncio.Event()
+    end_reason = "DROPPED"
+    inbound_media_messages = 0
+
+    async def frames() -> AsyncIterator[bytes]:
+        while True:
+            frame = await audio_queue.get()
+            if frame is None:
+                return
+            yield frame
+
+    async def process_prisma() -> None:
+        assert session is not None
+        try:
+            prisma = GnaniPrismaSTT(
+                api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+                language_code=os.getenv("GNANI_STT_LANGUAGE", "hi-IN"),
+                sample_rate=8000,
+                format="transcribe",
+                realtime_pace=True,
+            )
+            async for chunk in prisma.stream(frames()):
+                turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
+                if turn is not None and turn.next_action == "END_CALL":
+                    # ExotelTTSStream waits for a playback mark before the turn returns.
+                    call_done.set()
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Exotel call speech processing failed")
+            call_failed.set()
+
+    async def play_exotel_greeting() -> None:
+        """Play the greeting concurrently so the reader can receive its mark ack."""
+        assert session is not None and tts is not None
+        session.duplex_gate.start_speaking()
+        session.frame_buffer.clear()
+        session.eou_detector.clear()
+        try:
+            logger.info("Exotel greeting synthesis started")
+            async for _ in tts.synthesize(INITIAL_GREETING_HINGLISH):
+                pass
+            logger.info("Exotel greeting synthesis and playback mark completed")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Exotel greeting playback failed")
+            call_failed.set()
+        finally:
+            session.duplex_gate.stop_speaking()
+
+    try:
+        logger.info("Exotel AgentStream WebSocket accepted")
+        while True:
+            receive_task = asyncio.create_task(ws.receive_text())
+            done_task = asyncio.create_task(call_done.wait())
+            failed_task = asyncio.create_task(call_failed.wait())
+            finished, _ = await asyncio.wait(
+                {receive_task, done_task, failed_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if failed_task in finished and call_failed.is_set():
+                receive_task.cancel()
+                await asyncio.gather(receive_task, return_exceptions=True)
+                done_task.cancel()
+                await asyncio.gather(done_task, return_exceptions=True)
+                end_reason = "DROPPED"
+                break
+            if done_task in finished and call_done.is_set():
+                receive_task.cancel()
+                await asyncio.gather(receive_task, return_exceptions=True)
+                failed_task.cancel()
+                await asyncio.gather(failed_task, return_exceptions=True)
+                end_reason = "COMPLETED"
+                break
+            done_task.cancel()
+            failed_task.cancel()
+            await asyncio.gather(done_task, return_exceptions=True)
+            await asyncio.gather(failed_task, return_exceptions=True)
+            raw = receive_task.result()
+            try:
+                message = parse_exotel_message(raw)
+            except ExotelProtocolError:
+                # Avoid logging provider payloads, which may contain caller data.
+                await ws.close(code=4400, reason="Malformed AgentStream message")
+                break
+            event = message["event"]
+            if event == "connected":
+                logger.info("Exotel AgentStream connected event received")
+                continue
+            if event == "start":
+                start = message.get("start") or {}
+                stream_sid = str(message.get("stream_sid") or start.get("stream_sid") or "")
+                call_sid = _exotel_start_value(start, "call_sid", "CallSid", "callSid") or stream_sid
+                caller = _exotel_start_value(start, "from", "From", "caller") or "UNKNOWN"
+                sid = f"exotel-{call_sid}"
+                tts = ExotelTTSStream(ws, stream_sid)
+                session = CallSession(
+                    sid, caller=caller, source="EXOTEL", turn_runner=shared_turn_runner,
+                    tts=tts, sinks=_session_sinks(),
+                )
+                active_sessions[sid] = session
+                await session.start()
+                logger.info("Exotel call session started")
+                prisma_task = asyncio.create_task(process_prisma())
+                # Run TTS separately: this handler must keep reading mark events
+                # while the greeting waits for Exotel's playback acknowledgment.
+                greeting_task = asyncio.create_task(play_exotel_greeting())
+                continue
+            if event == "media":
+                if session is None:
+                    raise ExotelProtocolError("media arrived before start")
+                pcm = decode_exotel_media(message)
+                inbound_media_messages += 1
+                if inbound_media_messages == 1:
+                    logger.info("First Exotel inbound audio packet received (%d bytes)", len(pcm))
+                for frame in session.push_mic_audio(pcm):
+                    if audio_queue.full():
+                        try:
+                            audio_queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            pass
+                    audio_queue.put_nowait(frame)
+                if call_done.is_set():
+                    end_reason = "COMPLETED"
+                    break
+            elif event == "mark":
+                logger.info("Exotel playback mark received")
+                if tts is not None:
+                    tts.acknowledge_mark(message)
+                if call_done.is_set():
+                    end_reason = "COMPLETED"
+                    break
+            elif event == "stop":
+                logger.info("Exotel AgentStream stop event received")
+                end_reason = "COMPLETED" if call_done.is_set() else "DROPPED"
+                break
+            elif event == "dtmf":
+                # DTMF is currently informational; voice is the supported input path.
+                continue
+    except WebSocketDisconnect:
+        logger.info("Exotel AgentStream WebSocket disconnected")
+        pass
+    except ExotelProtocolError:
+        end_reason = "DROPPED"
+        logger.warning("Invalid Exotel AgentStream message; closing call WebSocket")
+        await ws.close(code=4400, reason="Invalid audio message")
+    except Exception:
+        logger.exception("Exotel AgentStream session failed")
+    finally:
+        if audio_queue.full():
+            try:
+                audio_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+        audio_queue.put_nowait(None)
+        if prisma_task is not None and not prisma_task.done():
+            prisma_task.cancel()
+            await asyncio.gather(prisma_task, return_exceptions=True)
+        if greeting_task is not None and not greeting_task.done():
+            greeting_task.cancel()
+            await asyncio.gather(greeting_task, return_exceptions=True)
+        if session is not None:
+            active_sessions.pop(session.session_id, None)
+            await session.end(reason=end_reason)
+            if end_reason == "COMPLETED":
+                try:
+                    await ws.close(code=1000)
+                except Exception:
+                    pass
+        logger.info(
+            "Exotel session ended (reason=%s, inbound_media_packets=%d)",
+            end_reason,
+            inbound_media_messages,
+        )
 

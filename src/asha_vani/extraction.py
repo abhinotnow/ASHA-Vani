@@ -30,8 +30,9 @@ Normalize spoken numbers only when clear (for example, 'dedh sau by pachhanave'
 means BP 150/95). Extract gestational weeks only when weeks are stated; do not
 convert months. Map only symptoms in the schema, marking PRESENT or ABSENT only
 when explicitly reported/denied; use UNKNOWN when mentioned but unclear.
-Set confirmation_intent to YES or NO only when answering a previous readback.
-If the previous action asked for a bare answer, interpret it in that context.
+Set confirmation_intent to YES or NO when answering a previous readback or a
+yes/no question such as whether another patient should be recorded. If the
+previous action asked for a bare answer, interpret it in that context.
 The model extracts facts only; deterministic Python rules assign triage."""
 
 _NUMBER_PHRASES: tuple[tuple[str, str], ...] = (
@@ -169,7 +170,10 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
 
     has_values = bool(visit_data) or any(patient.model_dump().values())
     confirmation = ConfirmationIntent.UNCLEAR
-    if expected_action == "CONFIRM_VALUES" and not has_values:
+    if expected_action in {
+        "CONFIRM_VALUES", "ASK_ANOTHER_PATIENT", "CONFIRM_PATIENT_MATCH",
+        "ASK_READ_PRIOR_RECORD",
+    } and not has_values:
         if _YES_RE.search(transcript):
             confirmation = ConfirmationIntent.YES
         elif _NO_RE.search(transcript):

@@ -29,6 +29,10 @@ class TurnOutput(ProjectModel):
 
     session_id: str
     utterance_seq: int
+    visit_number: int = 1
+    matched_patient_id: str | None = None
+    completed_visits: list[dict[str, Any]] = Field(default_factory=list)
+    call_complete: bool = False
     transcript: str
     patient: PatientReference = Field(default_factory=PatientReference)
     extracted_turn: ExtractedVisit = Field(default_factory=ExtractedVisit)
@@ -49,8 +53,17 @@ class TurnRunner(Protocol):
 class LangGraphTurnRunner:
     """Invoke one compiled per-call graph; all conversation state lives in its checkpoint."""
 
-    def __init__(self, graph: Any | None = None, *, require_full_checklist: bool = False) -> None:
-        self._graph = graph or build_call_graph(require_full_checklist=require_full_checklist)
+    def __init__(
+        self,
+        graph: Any | None = None,
+        *,
+        require_full_checklist: bool = False,
+        history_lookup: Any | None = None,
+    ) -> None:
+        self._graph = graph or build_call_graph(
+            require_full_checklist=require_full_checklist,
+            history_lookup=history_lookup,
+        )
 
     async def run_turn(self, session_id: str, utterance_seq: int, transcript: str) -> TurnOutput:
         state = await self._graph.ainvoke(
@@ -61,6 +74,10 @@ class LangGraphTurnRunner:
         return TurnOutput(
             session_id=session_id,
             utterance_seq=utterance_seq,
+            visit_number=int(state.get("visit_number", 1)),
+            matched_patient_id=state.get("matched_patient_id"),
+            completed_visits=list(state.get("completed_visits", [])),
+            call_complete=bool(state.get("call_complete", False)),
             transcript=transcript,
             patient=PatientReference.model_validate(state.get("patient", {})),
             extracted_turn=extraction.visit,

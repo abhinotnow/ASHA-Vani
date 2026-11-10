@@ -95,7 +95,7 @@ class CallSession:
             session_id=self.session_id,
             seq=self._event_seq,
             event_type=event_type,
-            is_simulated=True,
+            is_simulated=self.source != "EXOTEL",
             payload=payload,
         )
         for sink in self.sinks:
@@ -185,6 +185,8 @@ class CallSession:
                 CallEventType.TURN_COMPLETED,
                 {
                     "utterance_seq": seq,
+                    "visit_number": turn_out.visit_number,
+                    "matched_patient_id": turn_out.matched_patient_id,
                     "stt_transcript": turn_out.transcript,
                     "patient": turn_out.patient.model_dump(),
                     "extracted_turn": turn_out.extracted_turn.model_dump(),
@@ -206,12 +208,12 @@ class CallSession:
             return turn_out
 
     async def end(self, reason: str = "COMPLETED") -> CallEvent:
-        """Close the call session. Marks unconfirmed visits as INCOMPLETE if call dropped."""
+        """Close the call session. Any active unconfirmed visit is marked INCOMPLETE."""
         duration_s = round(max(0.0, self._clock() - self._started_at), 2)
         last_verification = (
             self.turn_history[-1].verification.value if self.turn_history else None
         )
-        if reason == "DROPPED" and last_verification == VerificationStatus.UNVERIFIED.value:
+        if last_verification == VerificationStatus.UNVERIFIED.value:
             last_verification = VerificationStatus.INCOMPLETE.value
 
         return await self._emit(
@@ -221,6 +223,8 @@ class CallSession:
                 "duration_s": duration_s,
                 "turns_count": len(self.turn_history),
                 "final_verification": last_verification,
+                "visit_number": self.turn_history[-1].visit_number if self.turn_history else 1,
+                "source": self.source,
             },
         )
 
