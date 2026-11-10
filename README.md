@@ -3,6 +3,10 @@
 **Voice-to-Register Decision Support & Early Warning System for Rural Maternal Healthcare**  
 *Built for the Gnani AI Great Indian AI Internship Challenge*
 
+📄 **[View / Download One-Page Solution Pitch (A4 PDF)](./ASHA-Vani_Solution_Pitch_A4.pdf)**
+
+![ASHA-Vani One-Page Solution Pitch](./ASHA-Vani_Solution_Pitch.png)
+
 ---
 
 ## 1. The Problem
@@ -30,19 +34,29 @@ With **ASHA-Vani**, an ASHA worker dials a toll-free number from any basic featu
 ```text
 ASHA-Vani/
 ├── AGENTS.md                        # System map, module ownership & edge-case invariants
+├── ASHA-Vani_Solution_Pitch_A4.pdf  # One-page A4 Solution Pitch (PDF)
+├── ASHA-Vani_Solution_Pitch.png     # One-page A4 Solution Pitch (High-Res Preview)
+├── SOLUTION_PITCH.md                # Full narrative solution pitch
 ├── docs/
-│   ├── ASHA-Vani-architecture-and-plan (1).md
-│   ├── person-a-build.md            # Person A (Voice, Session, Nokia Simulator) spec & contracts
-│   └── person-b-build.md            # Person B (Schemas, Validation, Triage, LangGraph) spec
+│   ├── exotel-setup.md              # Exotel AgentStream PSTN setup guide
+│   ├── furrow-design.md             # Furrow field-records design system spec
+│   ├── solution_pitch.html          # Printable HTML one-page pitch
+│   └── solution_pitch.tex           # LaTeX source for one-page pitch
 ├── src/asha_vani/
 │   ├── __init__.py
+│   ├── extraction.py                # Groq Llama 3.3 extraction, Roman transliteration & fallback
 │   ├── schemas.py                   # Pydantic models (ExtractedVisit, ValidationResult, TriageResult)
 │   ├── validation.py                # Hard/soft clinical range & BP consistency checks
 │   ├── triage.py                    # Deterministic maternal danger-sign rule engine (R1–R8)
 │   ├── graph.py                     # LangGraph per-turn state machine (call_graph)
+│   ├── persistence.py               # Supabase + local disk cache persistence
 │   ├── server.py                    # FastAPI + WebSocket server (/simulator, /ws/call, /ws/console)
-│   └── voice/                       # (Person A) Audio conditioning, STT/TTS, CallSession, TurnRunner, simulator.html
+│   └── voice/                       # Audio conditioning, Gnani Prisma/Timbre, CallSession, simulator_furrow.html
 └── tests/
+    ├── test_exotel_protocol.py      # Exotel AgentStream media & auth unit tests
+    ├── test_extraction.py           # Hindi/Hinglish/Devanagari extraction unit tests
+    ├── test_graph_flow.py           # Multi-turn LangGraph confirmation & correction flow tests
+    ├── test_persistence.py          # Supabase persistence & history matching tests
     ├── test_validation.py           # Boundary & consistency unit tests
     ├── test_triage.py               # Rule engine R1–R8 unit tests
     └── test_voice.py                # Voice pipeline, CallSession & TurnRunner unit tests
