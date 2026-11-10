@@ -104,3 +104,13 @@ Then open **`http://127.0.0.1:8000/simulator`** (or open [`src/asha_vani/voice/s
 | **Person A** | Voice transport, audio conditioning, Gnani Prisma/Timbre, `CallSession`, Nokia Simulator & Eval harness | `src/asha_vani/voice/`, `src/asha_vani/server.py`, `tests/test_voice.py` |
 | **Person B** | Clinical schemas, validation, deterministic triage rules (`R1–R8`), LangGraph flow, LLM extraction & DB persistence | `src/asha_vani/schemas.py`, `validation.py`, `triage.py`, `graph.py` |
 
+---
+
+## 6. Future Prospects
+
+- **Pan-India Multilingual Expansion (All Indian Languages):** ASHA workers serve rural communities across every state and union territory in India. Because our clinical validation (`validation.py`) and deterministic triage rule engine (`R1–R8` in `triage.py`) operate on language-agnostic structured schemas, we plan to expand ASHA-Vani across **all major Indian languages**—including **Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati, Odia, Punjabi, and Assamese**—by switching **Gnani Vachana Prisma STT** and **Gnani Timbre TTS** language codes (`ta-IN`, `te-IN`, `kn-IN`, `ml-IN`, `mr-IN`, `bn-IN`, `gu-IN`, `pa-IN`) per caller profile or state toll-free number, while continuing to normalize all PHC register entries into standardized English for Medical Officers.
+- **Automatic Language Detection & Worker Routing:** Link each ASHA worker's registered 3-digit ID / caller phone number to her preferred regional language and localized readback prompts automatically on call connect.
+- **Expanded NHM / RCH Register Coverage:** Extend deterministic rule sets beyond maternal ANC/PNC screening to cover neonatal danger signs (HBNC), childhood immunization tracking, and tuberculosis/anemia follow-ups.
+- **Two-Way SMS Receipt for Feature Phones:** Send an automatic SMS confirmation in the ASHA worker's local script immediately after a visit is marked `VERIFIED` so she has a portable receipt on her basic handset.
+
+
