@@ -1,0 +1,93 @@
+\documentclass[9pt,a4paper,twocolumn]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,top=12mm,bottom=12mm,left=13mm,right=13mm,columnsep=6mm]{geometry}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,urlcolor=black,linkcolor=black]{hyperref}
+\usepackage{titlesec}
+
+\definecolor{ink}{HTML}{1E1D1A}
+\definecolor{accent}{HTML}{D9530F}
+\definecolor{muted}{HTML}{55524A}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\setlist[itemize]{leftmargin=11pt,itemsep=1pt,topsep=1pt,parsep=0pt}
+
+\titleformat{\section}{\normalsize\bfseries\color{ink}}{\thesection.}{4pt}{}[\vspace{1pt}\titlerule]
+\titlespacing*{\section}{0pt}{5pt}{3pt}
+
+\begin{document}
+
+\twocolumn[{%
+  \begin{@twocolumnfalse}
+    \begin{center}
+      {\LARGE\bfseries ASHA-Vani: Voice-First Clinical Triage \& Early-Warning Register}\\[3pt]
+      {\small\color{muted}\textbf{Powered by Gnani Prisma STT \& Gnani Timbre v2.5 TTS} $\cdot$ Deterministic Maternal \& Rural Health Decision Support}\\[4pt]
+      \rule{\textwidth}{0.8pt}
+    \end{center}
+    \vspace{-4pt}
+  \end{@twocolumnfalse}
+}]
+
+\section{The Problem: Paper Registers \& Delayed Escalation}
+India's 1M+ Accredited Social Health Activists (\textbf{ASHAs}) conduct doorstep maternal and general health visits across rural villages, often operating on basic 2G feature phones in high-noise environments. Vital readings (blood pressure, hemoglobin, gestational age, danger signs) are written into paper registers and batch-entered days later at the Primary Health Centre (\textbf{PHC}). By the time severe preeclampsia ($\text{BP} \ge 160/110\text{ mmHg}$) or critical anemia ($\text{Hb} < 5.0\text{ g/dL}$) is reviewed by a Medical Officer, the window for early intervention has often closed.
+
+\section{The Solution: ASHA-Vani}
+\textbf{ASHA-Vani} turns any basic feature phone or PSTN line into a real-time, voice-verified clinical register and early-warning system. An ASHA worker dials in (via an Exotel PSTN bridge or the built-in 8\,kHz Nokia simulator) and speaks naturally in \textbf{Hindi or Hinglish}. Within milliseconds per turn, ASHA-Vani:
+\begin{itemize}
+  \item Streams 8\,kHz telephone audio through \textbf{Gnani Prisma STT} to transcribe code-mixed Hindi/Hinglish and Devanagari numerals.
+  \item Extracts structured clinical fields into a stateful \textbf{7-step LangGraph intake} (\texttt{CallState}) using Groq Llama 3.3 70B (with 8B/deterministic regex fallback).
+  \item Enforces \textbf{hard physiological bounds} and runs a \textbf{deterministic clinical rule engine (\texttt{R1--R8})}.
+  \item Speaks a \textbf{digit-by-digit Hindi/Hinglish readback} via \textbf{Gnani Timbre v2.5 TTS} and commits the record as \texttt{VERIFIED} only after the ASHA confirms.
+  \item Streams turn-by-turn updates to the \textbf{PHC Clinical Register Console} for 1-click Medical Officer home dispatch (\texttt{108} Ambulance, ANM Mobile, or Home Follow-up).
+\end{itemize}
+
+\section{Core Gnani.ai Voice Integration}
+\begin{itemize}
+  \item \textbf{8\,kHz Telephony Conditioning (\texttt{voice/audio.py}):} Incoming audio is resampled to 8\,kHz mono PCM16, band-pass filtered to PSTN telephone band ($300\text{--}3400\text{ Hz}$), $\mu$-law companded, and sliced into exact \textbf{1024-byte (64\,ms)} frames. Includes calibrated SNR field-noise injection ($15\text{ dB}$ and $5\text{ dB}$) to validate rural acoustic resilience.
+  \item \textbf{Gnani Prisma Streaming STT (\texttt{voice/stt.py}):} Bi-directional WebSocket streaming with dual End-of-Utterance (\textbf{EOU}) detection—triggering on either a $\sim 1.2\text{ s}$ silence window or the trailing radio keyword \texttt{``over''} / \texttt{``ओवर''} (automatically stripped prior to extraction). Supports DTMF keypad fallback (\texttt{0--9, *, \#}) when voice conditions are extreme.
+  \item \textbf{Gnani Timbre v2.5 TTS (\texttt{voice/tts.py}):} Synthesizes natural Hindi/Hinglish prompts (\texttt{Poorvi} / \texttt{Nalini} voices) at 8\,kHz PCM/WAV. Uses an in-memory fixed-script cache so recurring prompts and repeat requests incur zero redundant synthesis latency or API cost.
+  \item \textbf{Half-Duplex Anti-Echo Gate (\texttt{voice/session.py}):} Drops all incoming microphone frames while Timbre TTS is playing plus a strict \textbf{200\,ms acoustic tail guard} after playback finishes, preventing speaker-to-mic self-triggering on loudspeaker phones.
+\end{itemize}
+
+\section{Clinical Safety Architecture}
+ASHA-Vani is strictly a \textbf{decision-support and early-warning pipeline}, never an autonomous diagnosis engine:
+\begin{enumerate}[leftmargin=12pt,itemsep=1pt,topsep=1pt]
+  \item \textbf{The LLM Extracts; Deterministic Code Decides:} The language model only populates candidate slots (\texttt{ExtractedVisit}); risk classification is 100\% rule-based (\texttt{triage.py}).
+  \item \textbf{Refuse to Guess (Hard/Soft Range Guards):} Impossible ASR/speech artifacts (e.g., $\text{BP } 420/110\text{ mmHg}$, $\text{Hb } 28\text{ g/dL}$, or $\text{systolic} \le \text{diastolic}$) are rejected as \texttt{ERROR}, cleared to \texttt{None}, and routed to a targeted spoken repeat prompt—without masking co-occurring critical danger signs.
+  \item \textbf{Alert Early, Commit Late:} High-risk intakes appear on the PHC console immediately on Turn 1 marked \texttt{UNVERIFIED (In Call)} so officers have early situational awareness, flipping to \texttt{VERIFIED} only after the ASHA confirms the spoken readback (\emph{``Haan, sahi hai''}).
+\end{enumerate}
+
+\section{Deterministic Clinical Rule Engine (\texttt{R1--R8})}
+\vspace{1pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\columnwidth}{@{}l l X@{}}
+\toprule
+\textbf{Rule} & \textbf{Level} & \textbf{Deterministic Trigger Condition} \\
+\midrule
+\texttt{R1} & \textcolor{accent}{\textbf{CRITICAL}} & Severe hypertension: $\text{BP} \ge 160\text{ sys}$ or $\ge 110\text{ dia}$ \\
+\texttt{R2} & \textcolor{accent}{\textbf{CRITICAL}} & Elevated BP ($\ge 140/90$) + preeclampsia sign (headache, blurred vision, epigastric pain, facial edema) \\
+\texttt{R3} & \textbf{URGENT} & Moderate hypertension ($\ge 140/90$) without severe features \\
+\texttt{R4} & \textcolor{accent}{\textbf{CRITICAL}} & Antepartum vaginal bleeding at $\ge 20\text{ weeks}$ \\
+\texttt{R5} & \textcolor{accent}{\textbf{CRIT}}/\textbf{URG} & Severe anemia: $\text{Hb} < 5.0\text{ g/dL}$ (\texttt{CRITICAL}); $5.0 \le \text{Hb} < 7.0\text{ g/dL}$ (\texttt{URGENT}) \\
+\texttt{R6} & \textcolor{accent}{\textbf{CRITICAL}} & Eclampsia/seizure (\texttt{CONVULSION}) or \texttt{UNCONSCIOUS} \\
+\texttt{R7} & \textcolor{accent}{\textbf{CRITICAL}} & Preterm labour pains or leaking fluid at $< 37\text{ weeks}$ \\
+\texttt{R8} & \textbf{URGENT} & Reduced fetal movement at $\ge 28\text{ weeks}$ \\
+\bottomrule
+\end{tabularx}
+
+\section{System Verification \& Live Workspace}
+\begin{itemize}
+  \item \textbf{69 Automated Pytest Suites Passing:} Covers hard/soft validation boundaries, all \texttt{R1--R8} triage rules, Devanagari/Hinglish extraction, 1024-byte $\mu$-law framing, 200\,ms half-duplex gating, and multi-turn LangGraph confirmation recovery.
+  \item \textbf{Dual Live Workspaces + Supabase Persistence:} Includes the PHC Clinical Register Console + Nokia 2G Simulator (\texttt{/simulator} and Hallmark Furrow edition at \texttt{/furrow}) with live Exotel PSTN line mode and Supabase event recovery.
+\end{itemize}
+
+\end{document}
+

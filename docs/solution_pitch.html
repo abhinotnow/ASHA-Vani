@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ASHA-Vani 1-Page Solution Pitch: Voice-First Clinical Triage and Early-Warning Register Powered by Gnani Prisma STT and Timbre TTS." />
+  <title>ASHA-Vani: 1-Page Solution Pitch (Gnani Submission)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --color-paper: #ece7dc;
+      --color-sheet: #fdfbf7;
+      --color-ink: #1e1d1a;
+      --color-muted: #5a564e;
+      --color-rule: #d6cfc0;
+      --color-accent: #f26419;
+      --color-accent-soft: #f7dfd0;
+      --color-green-soft: #dfece0;
+      --font-display: "Red Hat Display", ui-sans-serif, system-ui, sans-serif;
+      --font-body: "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "Red Hat Mono", ui-monospace, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    body {
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      font-size: 9.2pt;
+      line-height: 1.38;
+      -webkit-font-smoothing: antialiased;
+      padding: 18px;
+    }
+
+    .screen-toolbar {
+      max-width: 210mm;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .btn-print {
+      background: var(--color-accent);
+      color: var(--color-ink);
+      border: 1px solid var(--color-ink);
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .a4-sheet {
+      width: 210mm;
+      min-height: 277mm;
+      max-height: 277mm;
+      margin: 0 auto;
+      background: var(--color-sheet);
+      border: 1px solid var(--color-ink);
+      padding: 11mm 12mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    /* Header Masthead */
+    .masthead {
+      border-bottom: 2px solid var(--color-ink);
+      padding-bottom: 7px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .masthead h1 {
+      font-family: var(--font-display);
+      font-size: 19pt;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .masthead-sub {
+      font-size: 8.8pt;
+      color: var(--color-muted);
+      margin-top: 3px;
+    }
+    .masthead-tag {
+      background: var(--color-ink);
+      color: var(--color-sheet);
+      font-family: var(--font-mono);
+      font-size: 7.8pt;
+      padding: 4px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    /* 2-Column Body Grid */
+    .pitch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 8px;
+      flex: 1;
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sec-title {
+      font-family: var(--font-display);
+      font-size: 10pt;
+      font-weight: 600;
+      border-bottom: 1px solid var(--color-ink);
+      padding-bottom: 2px;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .sec-title span.num {
+      font-family: var(--font-mono);
+      font-size: 7.8pt;
+      color: var(--color-muted);
+    }
+
+    p {
+      color: var(--color-ink);
+    }
+
+    ul {
+      padding-left: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 2.5px;
+    }
+
+    .arch-strip {
+      background: var(--color-paper);
+      border: 1px solid var(--color-ink);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: var(--font-mono);
+      font-size: 7.6pt;
+      line-height: 1.45;
+    }
+
+    .rule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8pt;
+    }
+    .rule-table th {
+      text-align: left;
+      font-weight: 500;
+      color: var(--color-muted);
+      border-bottom: 1px solid var(--color-ink);
+      padding: 2px 4px;
+    }
+    .rule-table td {
+      padding: 2.5px 4px;
+      border-bottom: 1px solid var(--color-rule);
+      vertical-align: top;
+    }
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .pill-crit {
+      background: var(--color-accent-soft);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+    .pill-urg {
+      background: var(--color-green-soft);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .footer-bar {
+      border-top: 1px solid var(--color-ink);
+      padding-top: 5px;
+      font-size: 7.8pt;
+      color: var(--color-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .screen-toolbar {
+        display: none !important;
+      }
+      .a4-sheet {
+        border: 0;
+        width: 100%;
+        max-height: none;
+        min-height: 0;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="screen-toolbar">
+    <span><strong>ASHA-Vani 1-Page Executive Solution Pitch</strong> · Formatted for single-page A4 PDF export</span>
+    <div style="display: flex; gap: 8px;">
+      <a href="/furrow" class="btn-print" style="text-decoration: none; background: var(--color-sheet);">Open Furrow UI (/furrow)</a>
+      <button class="btn-print" type="button" onclick="window.print()">Print / Save as 1-Page PDF</button>
+    </div>
+  </div>
+
+  <article class="a4-sheet">
+    <div>
+      <header class="masthead">
+        <div>
+          <h1>ASHA-Vani: Voice-First Clinical Triage &amp; Register</h1>
+          <div class="masthead-sub">
+            Real-time Hindi/Hinglish decision support &amp; early-warning ledger for rural Indian ASHA workers · Powered by <strong>Gnani Prisma STT</strong> &amp; <strong>Gnani Timbre v2.5 TTS</strong>
+          </div>
+        </div>
+        <div class="masthead-tag">1-PAGE SOLUTION PITCH</div>
+      </header>
+
+      <div class="pitch-grid">
+        <!-- LEFT COLUMN -->
+        <div class="col">
+          <section>
+            <div class="sec-title"><span>1. The Rural Clinical Bottleneck</span> <span class="num">PROBLEM</span></div>
+            <p>
+              Over <strong>1 million rural ASHA workers</strong> conduct doorstep maternal and general health visits across India, often using basic 2G feature phones in noisy village environments. Vital signs (blood pressure, hemoglobin, gestational weeks, danger signs) are written into paper registers and digitized days later at the Primary Health Centre (PHC). By the time severe preeclampsia (<span class="mono">BP &ge; 160/110</span>) or critical anemia (<span class="mono">Hb &lt; 5.0 g/dL</span>) is spotted by a Medical Officer, the window for early referral has often closed.
+            </p>
+          </section>
+
+          <section>
+            <div class="sec-title"><span>2. The ASHA-Vani Solution</span> <span class="num">OVERVIEW</span></div>
+            <p>
+              <strong>ASHA-Vani</strong> turns any basic feature phone or Exotel PSTN line into a voice-verified clinical register. The ASHA dials in and speaks naturally in <strong>Hindi or Hinglish</strong> (or dials DTMF keys when network audio is severe). Each spoken turn streams through <strong>Gnani Prisma STT</strong>, updates a <strong>7-step LangGraph intake state machine</strong>, runs hard physiological range checks and deterministic clinical rules (<span class="mono">R1–R8</span>), speaks a <strong>digit-by-digit confirm-back via Gnani Timbre TTS</strong>, and streams live updates to the PHC Medical Officer Console.
+            </p>
+          </section>
+
+          <section>
+            <div class="sec-title"><span>3. End-to-End Voice Pipeline</span> <span class="num">ARCHITECTURE</span></div>
+            <div class="arch-strip">
+              [2G Handset / Exotel PSTN] &rarr; 8 kHz PCM16 &middot; 300-3400 Hz &middot; &mu;-law (1024B frames)<br/>
+              &darr; Half-Duplex Gate (mutes mic during TTS + 200 ms acoustic tail)<br/>
+              [Gnani Prisma STT] &rarr; EOU Detector (~1.2s pause OR trailing "over")<br/>
+              &darr; TurnRunner Queue (strictly ordered per session_id)<br/>
+              [LangGraph CallState] &rarr; Extract (Llama 3.3 70B) &rarr; Validate &rarr; Triage (R1-R8)<br/>
+              &darr; Digit-by-digit readback (&rarr; [Gnani Timbre v2.5 TTS] w/ WAV cache)<br/>
+              [PHC Register Console + Supabase] &rarr; 1-Click 108 / ANM Home Dispatch
+            </div>
+          </section>
+
+          <section>
+            <div class="sec-title"><span>4. Deep Gnani.ai Integration</span> <span class="num">PRISMA + TIMBRE</span></div>
+            <ul>
+              <li><strong>8 kHz Telephony Conditioning (<span class="mono">voice/audio.py</span>):</strong> Resamples browser/PSTN audio to 8 kHz mono PCM16, applies 300–3400 Hz bandpass filtering, <span class="mono">&mu;</span>-law companding, exact <strong>1024-byte (64 ms)</strong> framing, and calibrated SNR noise injection (<span class="mono">15 dB / 5 dB</span>).</li>
+              <li><strong>Gnani Prisma STT (<span class="mono">voice/stt.py</span>):</strong> Streaming Hindi/Hinglish &amp; Devanagari recognition with dual End-of-Utterance detection (<span class="mono">1.2s</span> silence or trailing <span class="mono">"over"</span> keyword stripped before extraction).</li>
+              <li><strong>Gnani Timbre v2.5 TTS (<span class="mono">voice/tts.py</span>):</strong> Low-latency 8 kHz PCM/WAV synthesis (<span class="mono">Poorvi</span>/<span class="mono">Nalini</span> voices) with an in-memory fixed-script cache so greeting and follow-up prompts cost zero extra synthesis latency.</li>
+              <li><strong>Half-Duplex Anti-Echo Gate (<span class="mono">voice/session.py</span>):</strong> Drops incoming mic frames during TTS playback plus a <strong>200 ms tail mute</strong> so loudspeaker handsets never re-transcribe their own prompts.</li>
+            </ul>
+          </section>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="col">
+          <section>
+            <div class="sec-title"><span>5. Clinical Safety Invariants</span> <span class="num">SAFETY BY DESIGN</span></div>
+            <ul>
+              <li><strong>The LLM Extracts; Deterministic Code Decides:</strong> The model only extracts candidate slots (<span class="mono">ExtractedVisit</span>). Risk level is never assigned by an LLM—it is computed 100% deterministically in <span class="mono">triage.py</span>.</li>
+              <li><strong>Refuse to Guess (Hard/Soft Range Guards):</strong> Impossible ASR values (e.g., <span class="mono">BP 420/110</span>, <span class="mono">Hb 28.0</span>, or <span class="mono">systolic &le; diastolic</span>) fail hard validation (<span class="mono">ERROR</span>), are cleared to <span class="mono">None</span>, and trigger a targeted repeat question without hiding co-occurring critical symptoms.</li>
+              <li><strong>Alert Early, Commit Late:</strong> High-risk cases appear on the PHC console on Turn 1 marked <span class="mono">UNVERIFIED (In Call)</span> for early awareness, flipping to <span class="mono">VERIFIED</span> only after the ASHA confirms the spoken readback (<em>"Haan, sahi hai"</em>).</li>
+              <li><strong>General &amp; Maternal Pathways:</strong> If a patient is non-pregnant (<span class="mono">is_pregnant=False</span>), the state machine automatically skips gestational weeks and evaluates general vitals, severe anemia, fever, and neurological danger signs.</li>
+            </ul>
+          </section>
+
+          <section>
+            <div class="sec-title"><span>6. Deterministic Triage Rules (R1–R8)</span> <span class="num">RULE ENGINE</span></div>
+            <table class="rule-table">
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Risk</th>
+                  <th>Deterministic Clinical Trigger</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">R1</td>
+                  <td><span class="pill-crit">CRITICAL</span></td>
+                  <td>Severe hypertension: <span class="mono">BP &ge; 160 sys</span> or <span class="mono">&ge; 110 dia</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">R2</td>
+                  <td><span class="pill-crit">CRITICAL</span></td>
+                  <td>Elevated BP (<span class="mono">&ge; 140/90</span>) + severe headache, blurred vision, epigastric pain, or facial edema</td>
+                </tr>
+                <tr>
+                  <td class="mono">R3</td>
+                  <td><span class="pill-urg">URGENT</span></td>
+                  <td>Moderate hypertension (<span class="mono">&ge; 140/90</span>) without severe features</td>
+                </tr>
+                <tr>
+                  <td class="mono">R4</td>
+                  <td><span class="pill-crit">CRITICAL</span></td>
+                  <td>Antepartum vaginal bleeding at <span class="mono">&ge; 20 weeks</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">R5</td>
+                  <td><span class="pill-crit">CRIT</span>/<span class="pill-urg">URG</span></td>
+                  <td>Hemoglobin <span class="mono">&lt; 5.0 g/dL</span> (Critical) or <span class="mono">5.0–6.9 g/dL</span> (Urgent)</td>
+                </tr>
+                <tr>
+                  <td class="mono">R6</td>
+                  <td><span class="pill-crit">CRITICAL</span></td>
+                  <td>Eclampsia convulsion/seizure or unconsciousness (any BP)</td>
+                </tr>
+                <tr>
+                  <td class="mono">R7</td>
+                  <td><span class="pill-crit">CRITICAL</span></td>
+                  <td>Preterm labour pains or leaking fluid at <span class="mono">&lt; 37 weeks</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">R8</td>
+                  <td><span class="pill-urg">URGENT</span></td>
+                  <td>Reduced fetal movement at <span class="mono">&ge; 28 weeks</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <div class="sec-title"><span>7. Verification &amp; Live Deliverables</span> <span class="num">69 TESTS PASSING</span></div>
+            <ul>
+              <li><strong>69 Automated Pytest Tests Passing:</strong> Full coverage across <span class="mono">test_validation.py</span>, <span class="mono">test_triage.py</span>, <span class="mono">test_extraction.py</span>, <span class="mono">test_graph_flow.py</span>, <span class="mono">test_persistence.py</span>, and <span class="mono">test_voice.py</span>.</li>
+              <li><strong>PHC Register + Nokia 2G Handset Workspaces:</strong> Live WebSocket console (<span class="mono">/furrow</span> &amp; <span class="mono">/simulator</span>) with Waterproof Field-Notebook Card, Turn-by-Turn Voice Transcript Sheet, DTMF keypad, Exotel PSTN mode, and Supabase persistence.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer-bar">
+      <span><strong>ASHA-Vani</strong> · Voice-First Rural Clinical Decision Support</span>
+      <span class="mono">Routes: /furrow · /simulator · /pitch · /ws/call · /ws/console</span>
+      <span>All simulated telephony &amp; dispatch actions carry explicit <strong>SIM</strong> labels</span>
+    </footer>
+  </article>
+
+</body>
+</html>
+

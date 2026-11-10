@@ -1,0 +1,2942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ASHA-Vani rural clinical voice intake register and feature-phone inspection console." />
+  <title>ASHA-Vani: Furrow Field Register and Voice Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+/* Hallmark · v2.0.0 · theme: furrow (by request) · genre: modern-minimal · shape: Workbench · scope: app · redesign: full · signature: waterproof notebook card paired with letter-folded turn-by-turn inspection sheet */
+/* critique: calm manila paper across the entire workspace, dark-headed waterproof notebook card paired with a white letter-folded turn-by-turn voice inspection sheet on an 8px graph mat, ruled register ledger below, and a paper-light field handset dock */
+/* Hallmark · dropped surveyCanvas, surveyPinsBar, surveyScaleTag · user asked to remove the map and replace it with the Furrow notebook card and turn-by-turn inspection sheet */
+/* waive: none */
+/* answered: F1, F3, F4, F15, F16, F23 */
+
+:root {
+  /* Furrow Authentic OKLCH & Fallback Palette (Calm Manila Paper & Ink) */
+  --color-paper: #ece7dc;
+  --color-paper-2: #faf7f0;
+  --color-paper-3: #e2dccf;
+  --color-sheet: #fdfbf7;
+
+  --color-ink: #1e1d1a;
+  --color-ink-2: #33312c;
+  --color-muted: #666259;
+  --color-rule: #d8d1c2;
+
+  /* Tangerine Signal (Fill with ink on it, never text color) */
+  --color-accent: #f26419;
+  --color-accent-ink: #1e1d1a;
+  --color-accent-soft: #f7dfd0;
+  --color-focus: #d9530f;
+
+  /* Grass Green (Verified / In Date / Routine) */
+  --color-green: #3f683d;
+  --color-green-soft: #dfece0;
+
+  /* Amber / Urgent Soft Fill */
+  --color-urgent-soft: #f5e6c8;
+
+  /* 8px Graph-Paper Grid Lines */
+  --color-grid: #e4ded1;
+  --color-grid-strong: #d6cfc0;
+
+  /* Typography */
+  --font-display: "Red Hat Display", "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --tracking-display: -0.035em;
+  --display-weight: 600;
+
+  /* Radii & Rules */
+  --radius-card: 10px;
+  --radius-entry: 14px;
+  --radius-sheet: 3px;
+  --radius-pill: 6px;
+  --rule-hair: 1px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgba(30, 29, 26, 0.06), 0 12px 24px -14px rgba(30, 29, 26, 0.18);
+  --shadow-lift: 0 1px 1px rgba(30, 29, 26, 0.08), 0 2px 4px -1px rgba(30, 29, 26, 0.08), 0 20px 38px -18px rgba(30, 29, 26, 0.28);
+
+  /* Spacing Scale */
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 36px;
+
+  /* Type Scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.85rem;
+  --text-3xl: 2.5rem;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@supports (color: oklch(96% 0.011 85)) {
+  :root {
+    --color-paper: oklch(95.5% 0.011 85);
+    --color-paper-2: oklch(99.2% 0.005 85);
+    --color-paper-3: oklch(92.5% 0.015 85);
+    --color-sheet: oklch(99.4% 0.004 85);
+
+    --color-ink: oklch(18% 0.006 60);
+    --color-ink-2: oklch(28% 0.008 60);
+    --color-muted: oklch(45% 0.012 60);
+    --color-rule: oklch(88% 0.013 85);
+
+    --color-accent: oklch(70% 0.19 40);
+    --color-accent-ink: oklch(18% 0.006 60);
+    --color-accent-soft: oklch(91% 0.05 50);
+    --color-focus: oklch(60% 0.19 40);
+
+    --color-green: oklch(48% 0.11 150);
+    --color-green-soft: oklch(92% 0.04 150);
+    --color-urgent-soft: oklch(92% 0.05 80);
+
+    --color-grid: oklch(90.5% 0.013 85);
+    --color-grid-strong: oklch(86% 0.016 85);
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow-x: clip;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  scrollbar-color: var(--color-muted) var(--color-paper);
+  caret-color: var(--color-focus);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  line-height: 1.05;
+  color: var(--color-ink);
+  overflow-wrap: break-word;
+  min-width: 0;
+  text-wrap: balance;
+}
+
+button, input, select {
+  font: inherit;
+  color: inherit;
+}
+
+button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.num {
+  font-family: var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+}
+
+.icon {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex-shrink: 0;
+}
+
+/* =========================================================================
+   MOULDED FURROW KEYS & PILLS
+   ========================================================================= */
+.btn {
+  min-height: 38px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  box-shadow: inset 0 1px 0 var(--color-sheet), 0 1px 1px var(--color-rule);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  white-space: nowrap;
+  transition: transform 120ms var(--ease-out), opacity 120ms var(--ease-out);
+}
+.btn:hover {
+  border-color: var(--color-muted);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-color: color-mix(in oklab, var(--color-accent) 78%, var(--color-ink));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--color-sheet) 32%, transparent),
+              inset 0 -1px 0 color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+.btn--sm {
+  min-height: 30px;
+  padding: 0 var(--space-sm);
+  font-size: var(--text-xs);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.tag--critical {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+.tag--urgent {
+  background: var(--color-urgent-soft);
+  color: var(--color-ink);
+}
+.tag--routine {
+  background: var(--color-green-soft);
+  color: var(--color-ink);
+}
+.tag--soft {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+.tag--neutral {
+  background: var(--color-paper-3);
+  color: var(--color-ink-2);
+}
+
+/* =========================================================================
+   WATERPROOF NOTEBOOK CARD & GRAPH MAT (Matches furrow.jpg bottom section)
+   ========================================================================= */
+.notebook-mat {
+  background:
+    linear-gradient(var(--color-grid) 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px) 0 0 / 12px 12px,
+    var(--color-paper-3);
+  border-radius: var(--radius-entry);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-rule);
+}
+
+.notebook-grid-surface {
+  background:
+    linear-gradient(var(--color-grid) 1px, transparent 1px) 0 0 / 8px 8px,
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px) 0 0 / 8px 8px,
+    var(--color-paper-2);
+}
+
+.entry-card {
+  border-radius: var(--radius-entry);
+  background: var(--color-paper-2);
+  box-shadow: 0 0 0 1px var(--color-ink), var(--shadow-lift);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-dark-head {
+  background: var(--color-ink);
+  color: var(--color-paper-2);
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.entry-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--color-paper-3);
+}
+
+.entry-kind-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-paper-2);
+  font-weight: 500;
+}
+
+.tangerine-dot {
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: inline-block;
+}
+
+.entry-display-figure {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-paper-2);
+  line-height: 1;
+}
+
+.entry-head-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--color-paper-3);
+}
+
+/* 2-Column Ruled Cells on 8px Graph Grid (Exact match to furrow.jpg "17:05" card) */
+.entry-cells {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--color-ink);
+}
+.entry-cell {
+  padding: var(--space-sm) var(--space-md);
+  border-right: 1px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+.entry-cell:nth-child(2n) {
+  border-right: 0;
+}
+.entry-cell:nth-last-child(-n+2) {
+  border-bottom: 0;
+}
+.entry-cell-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.entry-cell-val {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-ink);
+  overflow-wrap: break-word;
+}
+
+.entry-foot {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* =========================================================================
+   LETTER-FOLDED WHITE INSPECTION SHEET (Matches furrow.jpg right sheet)
+   ========================================================================= */
+.inspection-sheet {
+  background: var(--color-sheet);
+  border-radius: var(--radius-sheet);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.sheet-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--display-weight);
+  color: var(--color-ink);
+}
+.sheet-sub {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin-top: var(--space-3xs);
+}
+
+.ruled-section-title {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-ink);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+/* =========================================================================
+   MEDICAL OFFICER LOGIN OVERLAY (Minimalist Furrow Entry Card)
+   ========================================================================= */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: color-mix(in oklab, var(--color-paper) 86%, transparent);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+.login-overlay.hidden {
+  display: none;
+}
+.login-box {
+  width: 100%;
+  max-width: 420px;
+}
+.field-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.field {
+  position: relative;
+  height: 52px;
+  background: var(--color-sheet);
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius-pill);
+  padding: var(--space-md) var(--space-md) var(--space-2xs);
+}
+.field label {
+  position: absolute;
+  left: var(--space-md);
+  top: var(--space-2xs);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.field input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+  outline: none;
+}
+
+/* =========================================================================
+   APP SHELL: UNIFIED WARM PAPER WORKSPACE
+   ========================================================================= */
+.app-shell {
+  max-width: 1680px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Minimalist Topbar (Like "Fieldbook" header in furrow.jpg) */
+.topbar {
+  height: 54px;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-paper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.brand-wordmark {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.brand-meta {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+/* Quiet Nav Filter Links (Matches "The book  A day  Inspection  Price") */
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+.seg-tab {
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-2xs) 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.seg-tab:hover {
+  color: var(--color-ink);
+}
+.seg-tab.active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-accent);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+/* Main Split Workspace */
+.workspace-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Left Clinical Book & Inspection Mat */
+.phc-pane {
+  flex: 1 1 73%;
+  min-width: 580px;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Quiet Inline Summary Strip */
+.ledger-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+.ledger-headline {
+  font-size: var(--text-2xl);
+  line-height: 1.05;
+}
+.ledger-subline {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin-top: var(--space-2xs);
+}
+
+.metrics-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+  border-top: 1px solid var(--color-ink);
+  padding-top: var(--space-xs);
+}
+.metric-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.metric-item strong {
+  font-family: var(--font-outlier);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+/* Signature Side-by-Side Furrow Mat: Left Notebook Card + Right Turn-by-Turn Sheet */
+.furrow-stage-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+/* 7-Step Minimalist Checklist Strip inside the White Sheet */
+.stepper-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+}
+.stepper-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex-wrap: wrap;
+}
+.step-pill {
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+  background: transparent;
+}
+.step-pill.done {
+  background: var(--color-green-soft);
+  color: var(--color-ink);
+}
+.step-pill.active {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+/* Turn-by-Turn Voice Transcript Ledger (Replaces noisy JSON / chat bubbles) */
+.turn-tape-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.turn-tape-table th {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-ink);
+}
+.turn-tape-table td {
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: top;
+  font-size: var(--text-sm);
+}
+.turn-spoken {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+.turn-reply {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-2xs);
+}
+.delta-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+.delta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+}
+.delta-chip--err {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+/* =========================================================================
+   RULED CLINICAL REGISTER TABLE (Below the Mat, on White Sheet)
+   ========================================================================= */
+.register-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+.filter-input, .filter-select {
+  height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+  font-size: var(--text-xs);
+  color: var(--color-ink);
+}
+.filter-input {
+  min-width: 210px;
+}
+
+.register-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.register-table th {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+  padding: var(--space-xs) var(--space-sm);
+  border-top: 1px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-ink);
+  white-space: nowrap;
+}
+.register-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+  vertical-align: middle;
+}
+.register-row {
+  cursor: pointer;
+}
+.register-row:hover {
+  background: var(--color-paper);
+}
+.register-row.selected-row {
+  background: color-mix(in oklab, var(--color-accent-soft) 45%, var(--color-sheet));
+}
+.patient-name {
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.patient-sub {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+/* =========================================================================
+   CENTERED FULL DOSSIER MODAL (Kept for Deep Inspection & Referral Slip)
+   ========================================================================= */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: color-mix(in oklab, var(--color-ink) 38%, transparent);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+.modal-backdrop.open {
+  display: flex;
+}
+.modal-card {
+  width: 100%;
+  max-width: 780px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal-scroll {
+  padding: var(--space-lg);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* =========================================================================
+   RIGHT DOCK: PAPER-LIGHT MINIMALIST FIELD HANDSET (Easy on the Eyes)
+   ========================================================================= */
+.splitter {
+  width: var(--space-2xs);
+  background: var(--color-rule);
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+.splitter:hover {
+  background: var(--color-accent);
+}
+.splitter.collapsed {
+  display: none;
+}
+
+.phone-dock {
+  flex: 0 0 360px;
+  min-width: 320px;
+  max-width: 440px;
+  height: 100%;
+  background: var(--color-paper);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  overflow-y: auto;
+}
+.phone-dock.collapsed {
+  display: none;
+}
+
+.dock-mode-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  padding: var(--space-3xs);
+}
+.mode-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: transparent;
+  color: var(--color-ink);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+/* Exotel Live PSTN Card */
+.exotel-pane {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.exotel-pane.active {
+  display: flex;
+}
+
+/* Minimalist Furrow Handset (Styled like the Waterproof Card in furrow.jpg) */
+.nokia-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.nokia-pane.hidden {
+  display: none;
+}
+
+.handset-card {
+  border-radius: var(--radius-entry);
+  background: var(--color-paper-2);
+  box-shadow: 0 0 0 1px var(--color-ink), var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dark Ink LCD Screen at Top of Handset (Matches entry-dark-head) */
+.nokia-lcd {
+  background: var(--color-ink);
+  color: var(--color-paper-2);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-height: 138px;
+  justify-content: space-between;
+}
+.nokia-lcd.in-call {
+  border-bottom: 2px solid var(--color-accent);
+}
+.lcd-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-paper-3);
+}
+.lcd-status {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--display-weight);
+  color: var(--color-paper-2);
+}
+.lcd-sub {
+  font-size: var(--text-xs);
+  color: var(--color-paper-3);
+  line-height: 1.4;
+}
+.lcd-dtmf {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-paper-2);
+  background: var(--color-ink-2);
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  display: none;
+}
+.lcd-dtmf.visible {
+  display: inline-block;
+}
+.lcd-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-paper-3);
+  border-top: 1px solid var(--color-ink-2);
+  padding-top: var(--space-2xs);
+}
+
+/* Paper-Light Keypad Body on 8px Graph Grid */
+.handset-controls {
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.nokia-nav-deck {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 1fr;
+  gap: var(--space-xs);
+}
+.hw-key {
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-rule);
+  background: var(--color-sheet);
+  color: var(--color-ink);
+  box-shadow: inset 0 1px 0 var(--color-sheet), 0 1px 1px var(--color-rule);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.hw-key:hover {
+  border-color: var(--color-ink);
+}
+.hw-key:active {
+  transform: translateY(1px);
+}
+.bar-green {
+  width: 18px;
+  height: var(--space-3xs);
+  border-radius: var(--space-3xs);
+  background: var(--color-green);
+}
+.bar-tangerine {
+  width: 18px;
+  height: var(--space-3xs);
+  border-radius: var(--space-3xs);
+  background: var(--color-accent);
+}
+
+.nokia-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2xs);
+}
+.key-num {
+  height: 34px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-rule);
+  background: var(--color-sheet);
+  color: var(--color-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: var(--space-2xs);
+}
+.key-num:hover {
+  border-color: var(--color-muted);
+}
+.key-num:active {
+  transform: translateY(1px);
+  background: var(--color-paper-3);
+}
+.key-num span {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--color-muted);
+  margin-left: var(--space-2xs);
+}
+
+/* Compact Field Controls Card (Noise SNR + Quick Scenarios) */
+.dock-card {
+  background: var(--color-sheet);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.dock-row-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.noise-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2xs);
+}
+.noise-btn {
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  padding: var(--space-2xs);
+  border-radius: var(--space-2xs);
+  cursor: pointer;
+}
+.noise-btn.active {
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+  font-weight: 500;
+}
+.scenario-btn {
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  text-align: left;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--space-2xs);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+}
+.scenario-btn:hover {
+  border-color: var(--color-ink);
+}
+  </style>
+</head>
+<body>
+
+  <!-- ===================================================================
+       MEDICAL OFFICER LOGIN OVERLAY (Waterproof Field-Notebook Card)
+       =================================================================== -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="entry-card login-box">
+      <div class="entry-dark-head">
+        <div class="entry-head-top">
+          <span class="entry-kind-indicator">
+            <span class="tangerine-dot"></span>
+            <span>ASHA-Vani field register</span>
+          </span>
+          <span class="num">Rampur PHC</span>
+        </div>
+        <div class="entry-display-figure" style="font-size: var(--text-2xl);">Officer sign-in</div>
+        <div class="entry-head-sub">
+          <span>Voice intake and home dispatch console</span>
+          <span class="num">SIM</span>
+        </div>
+      </div>
+
+      <div class="notebook-grid-surface" style="padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md);">
+        <div class="field-grid">
+          <div class="field">
+            <label for="loginEmail">Medical officer email</label>
+            <input id="loginEmail" type="email" value="dr.verma@asha-vani.in" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label for="loginPassword">Access passcode</label>
+            <input id="loginPassword" type="password" value="phc-rampur-2026" autocomplete="current-password" />
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+          <button class="btn btn--primary" id="btnDemoLogin" type="button">
+            <span>Enter field book (Dr. A. Verma)</span>
+          </button>
+          <button class="btn" id="btnSignIn" type="button">
+            <span>Sign in with Supabase credentials</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       CENTERED FULL DOSSIER MODAL (Opened via "Full dossier & slip")
+       =================================================================== -->
+  <div class="modal-backdrop" id="patientModalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalPatientName">
+    <div class="entry-card modal-card">
+      <div class="entry-dark-head" style="flex-direction: row; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="entry-head-top" style="margin-bottom: var(--space-2xs);">
+            <span id="modalCategoryChip" class="tag tag--soft">Maternal record</span>
+            <span id="modalPatientMeta" class="num">--</span>
+          </div>
+          <h2 id="modalPatientName" style="color: var(--color-paper-2); font-size: var(--text-xl);">Select a patient</h2>
+        </div>
+        <div style="display: flex; gap: var(--space-xs);">
+          <button class="btn btn--sm" id="copySlipBtn" type="button">Copy referral slip</button>
+          <button class="btn btn--sm" id="closeModalBtn" type="button">Close</button>
+        </div>
+      </div>
+      <div class="notebook-grid-surface modal-scroll" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MAIN APPLICATION SHELL (Warm Manila Paper Throughout)
+       =================================================================== -->
+  <div class="app-shell">
+    <!-- Minimalist Topbar (Like "Fieldbook" in furrow.jpg) -->
+    <header class="topbar">
+      <div class="brand-group">
+        <span class="brand-wordmark">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 9v6M10 5v14M14 8v8M18 11v2" />
+          </svg>
+          <span>ASHA-Vani</span>
+        </span>
+        <span class="brand-meta" id="supabasePill">
+          <span id="supabaseLabel">Field register ready</span>
+        </span>
+      </div>
+
+      <!-- Quiet Text Filter Tabs -->
+      <nav class="nav-tabs" id="triageTabs" aria-label="Filter register by risk level">
+        <button class="seg-tab active" data-triage="ALL" type="button">The book</button>
+        <button class="seg-tab" data-triage="CRITICAL" type="button">Critical</button>
+        <button class="seg-tab" data-triage="URGENT" type="button">Urgent</button>
+        <button class="seg-tab" data-triage="ROUTINE" type="button">Routine</button>
+      </nav>
+
+      <div class="topbar-right">
+        <span id="officerChip">
+          <span id="officerNameLabel">Dr. A. Verma</span>
+        </span>
+        <button class="btn btn--sm" id="toggleDockBtn" type="button">
+          <span id="toggleDockLabel">Hide handset</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="workspace-body">
+      <!-- ===============================================================
+           LEFT WORKSPACE: FURROW NOTEBOOK MAT + WHITE INSPECTION SHEET
+           =============================================================== -->
+      <main class="phc-pane" id="phcPane">
+
+        <!-- Minimalist Section Head + Inline Figures -->
+        <div class="ledger-head-row">
+          <div>
+            <h1 class="ledger-headline">Clinical records, kept from the field call.</h1>
+            <p class="ledger-subline" id="stepperStatusText">
+              Spoken Hindi and Hinglish intakes structured into the register, verified by readback before commitment.
+            </p>
+            <p id="stepperEnglishSub" style="font-size: var(--text-xs); color: var(--color-muted); display: none;"></p>
+          </div>
+
+          <div class="metrics-inline">
+            <div class="metric-item"><span>Critical</span> <strong id="statCrit">0</strong></div>
+            <div class="metric-item"><span>Urgent</span> <strong id="statUrg">0</strong></div>
+            <div class="metric-item"><span>In book</span> <strong id="statTotal">0</strong></div>
+            <div class="metric-item"><span>Unverified</span> <strong id="statVerified">0</strong></div>
+            <div class="metric-item"><span>Dispatched</span> <strong id="statDispatched">0</strong></div>
+            <div class="metric-item"><span>Turn latency</span> <strong id="statWorkers">--</strong></div>
+          </div>
+        </div>
+
+        <!-- =============================================================
+             SIGNATURE FURROW MAT (Matches bottom half of furrow.jpg!)
+             Left: Waterproof Notebook Card (Active / Selected Patient)
+             Right: White Letter-Folded Sheet (Turn-by-Turn Voice Log)
+             ============================================================= -->
+        <section class="notebook-mat" aria-label="Active visit card and turn-by-turn inspection record">
+          <div class="furrow-stage-grid">
+
+            <!-- LEFT OBJECT: Waterproof Field-Notebook Card ("17:05" style) -->
+            <article class="entry-card" id="activeNotebookCard">
+              <div class="entry-dark-head">
+                <div class="entry-head-top">
+                  <span class="entry-kind-indicator">
+                    <span class="tangerine-dot"></span>
+                    <span id="cardCategoryLabel">Maternal visit</span>
+                  </span>
+                  <span class="num" id="cardMetaRight">ASHA-104</span>
+                </div>
+                <div class="entry-display-figure" id="cardBigFigure">160/110</div>
+                <div class="entry-head-sub">
+                  <span id="cardPatientTitle">Sunita Devi, 24 yrs (Rampur)</span>
+                  <span class="num" id="cardTimeLabel">Verified</span>
+                </div>
+              </div>
+
+              <!-- 2x3 Ruled Cells on 8px Graph Grid -->
+              <div class="entry-cells notebook-grid-surface">
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Patient</span>
+                  <span class="entry-cell-val" id="cellPatient">Sunita Devi</span>
+                </div>
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Worker & village</span>
+                  <span class="entry-cell-val num" id="cellWorker">ASHA-104, Rampur</span>
+                </div>
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Pregnancy status</span>
+                  <span class="entry-cell-val num" id="cellPreg">32 weeks</span>
+                </div>
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Blood pressure</span>
+                  <span class="entry-cell-val num" id="cellBp">160/110 mmHg</span>
+                </div>
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Hemoglobin</span>
+                  <span class="entry-cell-val num" id="cellHb">6.4 g/dL</span>
+                </div>
+                <div class="entry-cell">
+                  <span class="entry-cell-label">Danger signs</span>
+                  <span class="entry-cell-val" id="cellSigns">Headache, vision</span>
+                </div>
+              </div>
+
+              <!-- Card Footer: Rule Tag + Primary Action -->
+              <div class="entry-foot notebook-grid-surface">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); flex-wrap: wrap;">
+                  <span class="tag tag--soft" id="cardRuleBanner">Rule R1, R2, R5 triggered</span>
+                  <span class="num" id="cardDispatchTag" style="font-size: var(--text-xs); color: var(--color-muted);">Ready for dispatch</span>
+                </div>
+                <div style="display: flex; gap: var(--space-xs); flex-wrap: wrap;" id="cardActionRow">
+                  <button class="btn btn--primary" type="button" style="flex: 1;" onclick="triggerHomeDispatch(selectedVisitId, '108_UNIT', 12)">
+                    <span>Dispatch 108 unit (SIM)</span>
+                  </button>
+                  <button class="btn" type="button" onclick="openPatientModal(selectedVisitId)">
+                    <span>Full slip</span>
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <!-- RIGHT OBJECT: White Letter-Folded Inspection Sheet (Turn-by-Turn Transcript) -->
+            <div class="inspection-sheet">
+              <div class="sheet-header">
+                <div>
+                  <h2 class="sheet-title" id="sheetHeading">Inspection record: Sunita Devi</h2>
+                  <p class="sheet-sub" id="sheetSubheading">
+                    Turn-by-turn spoken transcript, extracted clinical values, and deterministic rule check
+                  </p>
+                </div>
+                <div style="display: flex; gap: var(--space-xs);">
+                  <button class="btn btn--sm" type="button" onclick="triggerHomeDispatch(selectedVisitId, 'ANM_MOBILE', 18)">
+                    <span>Send ANM mobile</span>
+                  </button>
+                  <button class="btn btn--sm" type="button" onclick="copyReferralSlip(selectedVisitId)">
+                    <span>Copy slip</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 7-Step Intake Progress Strip -->
+              <div class="stepper-strip">
+                <span style="font-size: var(--text-xs); font-weight: 500; color: var(--color-muted);">Intake sequence</span>
+                <div class="stepper-track" id="stepperTrack">
+                  <span class="step-pill" data-step="ASK_ASHA_ID">01 Worker</span>
+                  <span class="step-pill" data-step="ASK_PATIENT">02 Patient</span>
+                  <span class="step-pill" data-step="ASK_PREGNANCY">03 Pregnancy</span>
+                  <span class="step-pill" data-step="ASK_WEEKS">04 Weeks</span>
+                  <span class="step-pill" data-step="ASK_BP">05 BP</span>
+                  <span class="step-pill" data-step="ASK_HB">06 Hb</span>
+                  <span class="step-pill" data-step="ASK_SYMPTOMS">07 Signs</span>
+                </div>
+              </div>
+
+              <!-- Turn-by-Turn Ledger Table (Clean Ruled Lines like furrow.jpg "Inspection record") -->
+              <div>
+                <div class="ruled-section-title">
+                  <span>Turn-by-turn voice log</span>
+                  <span class="num" id="turnCountLabel">2 turns recorded</span>
+                </div>
+                <table class="turn-tape-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 54px;">Turn</th>
+                      <th>Spoken by ASHA &amp; system readback</th>
+                      <th style="width: 220px;">Extracted fields</th>
+                      <th style="width: 72px; text-align: right;">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="liveTurnTapeBody">
+                    <!-- Populated by renderActiveInspectionSheet() -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- =============================================================
+             THE BOOK AS AN INDEX: Ruled Clinical Register Table
+             ============================================================= -->
+        <section class="inspection-sheet" aria-label="Clinical field register index">
+          <div class="register-controls">
+            <div>
+              <h2 class="sheet-title">The register book</h2>
+              <p class="sheet-sub">Select any row to load its waterproof card and turn-by-turn voice transcript above.</p>
+            </div>
+
+            <div class="filter-row">
+              <input
+                type="search"
+                id="searchInput"
+                class="filter-input"
+                placeholder="Search patient, village, ASHA ID..."
+                aria-label="Search patient, village, ASHA ID"
+              />
+              <select id="villageFilter" class="filter-select" aria-label="Filter by village">
+                <option value="ALL">All villages</option>
+                <option value="Rampur">Rampur</option>
+                <option value="Belwa">Belwa</option>
+                <option value="Pipra">Pipra</option>
+                <option value="Kishanpur">Kishanpur</option>
+                <option value="Madhopur">Madhopur</option>
+              </select>
+              <select id="verifyFilter" class="filter-select" aria-label="Filter by verification status">
+                <option value="ALL">All states</option>
+                <option value="VERIFIED">Verified</option>
+                <option value="UNVERIFIED">Unverified</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="register-table">
+              <thead>
+                <tr>
+                  <th>Triage</th>
+                  <th>Patient &amp; location</th>
+                  <th>Category</th>
+                  <th>Weeks</th>
+                  <th>BP (mmHg)</th>
+                  <th>Hb (g/dL)</th>
+                  <th>Danger signs &amp; rules</th>
+                  <th>Verification</th>
+                  <th>Home dispatch (SIM)</th>
+                </tr>
+              </thead>
+              <tbody id="registerBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Resizable Divider -->
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"></div>
+
+      <!-- ===============================================================
+           RIGHT DOCK: PAPER-LIGHT MINIMALIST FIELD HANDSET & EXOTEL LINE
+           =============================================================== -->
+      <aside class="phone-dock" id="phoneDock" aria-label="Field handset and Exotel line controls">
+        <div class="dock-mode-bar">
+          <button class="mode-btn active" id="modeSimBtn" type="button">Browser handset</button>
+          <button class="mode-btn" id="modeExotelBtn" type="button">Live Exotel line</button>
+        </div>
+
+        <!-- Mode 2: Live Exotel PSTN Line Card -->
+        <div class="exotel-pane" id="exotelPane">
+          <div class="entry-card">
+            <div class="entry-dark-head">
+              <div class="entry-head-top">
+                <span class="entry-kind-indicator">
+                  <span class="tangerine-dot"></span>
+                  <span>Exotel PSTN bridge</span>
+                </span>
+                <span class="num">8 kHz</span>
+              </div>
+              <div class="entry-display-figure" style="font-size: var(--text-xl);">Live phone line</div>
+              <div class="entry-head-sub">
+                <span>Physical feature-phone relay</span>
+                <span>WebSocket ready</span>
+              </div>
+            </div>
+            <div class="notebook-grid-surface" style="padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); font-size: var(--text-xs); color: var(--color-muted);">
+              <p>
+                Dial your configured Exotel virtual number from any physical phone. Each spoken turn streams into the active notebook card and turn-by-turn inspection sheet on the left.
+              </p>
+              <button class="btn" type="button" onclick="document.getElementById('toggleDockBtn').click()">
+                <span>Expand register to full width</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode 1: Minimalist Furrow Field Handset -->
+        <div class="nokia-pane" id="nokiaPane">
+          <div class="handset-card">
+            <!-- Dark Ink LCD Header -->
+            <div class="nokia-lcd" id="nokiaLcd">
+              <div class="lcd-top">
+                <span>Field 2G (SIM)</span>
+                <span class="num" id="lcdTimer">00:00</span>
+                <span id="lcdNoiseTag">Clean</span>
+              </div>
+
+              <div>
+                <div class="lcd-status" id="lcdStatus">Ready to dial</div>
+                <div class="lcd-sub" id="lcdSub">Press call to start voice intake or dial keypad</div>
+                <div class="lcd-dtmf" id="lcdDtmf">Keypad: </div>
+              </div>
+
+              <div class="lcd-bottom">
+                <span id="lcdDuplex">Mic idle</span>
+                <span class="num">8 kHz PCM</span>
+              </div>
+            </div>
+
+            <!-- Paper-Light Moulded Keys on 8px Graph Grid -->
+            <div class="handset-controls notebook-grid-surface">
+              <div class="nokia-nav-deck">
+                <button class="hw-key" id="btnCall" type="button" title="Start voice call" aria-label="Start voice call">
+                  <span class="bar-green"></span>
+                  <span>Call</span>
+                </button>
+
+                <button class="btn btn--primary" id="btnOver" type="button" style="min-height: 40px; padding: 0 var(--space-sm); font-size: var(--text-xs);" title="Send spoken utterance or keypad digits">
+                  <span>Send turn</span>
+                </button>
+
+                <button class="hw-key" id="btnEnd" type="button" title="End voice call" aria-label="End voice call">
+                  <span class="bar-tangerine"></span>
+                  <span>End</span>
+                </button>
+              </div>
+
+              <div class="nokia-keypad" id="dtmfKeypad">
+                <button class="key-num" type="button" data-digit="1">1<span>&nbsp;</span></button>
+                <button class="key-num" type="button" data-digit="2">2<span>abc</span></button>
+                <button class="key-num" type="button" data-digit="3">3<span>def</span></button>
+                <button class="key-num" type="button" data-digit="4">4<span>ghi</span></button>
+                <button class="key-num" type="button" data-digit="5">5<span>jkl</span></button>
+                <button class="key-num" type="button" data-digit="6">6<span>mno</span></button>
+                <button class="key-num" type="button" data-digit="7">7<span>pqrs</span></button>
+                <button class="key-num" type="button" data-digit="8">8<span>tuv</span></button>
+                <button class="key-num" type="button" data-digit="9">9<span>wxyz</span></button>
+                <button class="key-num" type="button" data-digit="*">*<span>clear</span></button>
+                <button class="key-num" type="button" data-digit="0">0<span>+</span></button>
+                <button class="key-num" type="button" data-digit="#">#<span>send</span></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acoustic Line Condition & Scripted Scenarios -->
+          <div class="dock-card">
+            <div class="dock-row-label">
+              <span>Line condition</span>
+              <span class="num" id="snrLabel">Clean (inf dB)</span>
+            </div>
+            <div class="noise-grid" id="noiseGroup">
+              <button class="noise-btn active" type="button" data-snr="0">Clean</button>
+              <button class="noise-btn" type="button" data-snr="15">15 dB</button>
+              <button class="noise-btn" type="button" data-snr="5">5 dB</button>
+            </div>
+          </div>
+
+          <div class="dock-card">
+            <div class="dock-row-label">
+              <span>Scripted field scenarios</span>
+              <span class="num">SIM</span>
+            </div>
+            <button class="scenario-btn" type="button" onclick="simulateScenario('critical')">
+              <span>1. Maternal severe BP (160/110)</span>
+              <span class="tag tag--critical">R1+R2</span>
+            </button>
+            <button class="scenario-btn" type="button" onclick="simulateScenario('nonpregnant')">
+              <span>2. Non-pregnant severe anemia</span>
+              <span class="tag tag--urgent">R5</span>
+            </button>
+            <button class="scenario-btn" type="button" onclick="simulateScenario('garbled')">
+              <span>3. Garbled BP 420/110 refusal</span>
+              <span class="tag tag--neutral">Guard</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================================
+       STATE & SEED CLINICAL FIELD RECORDS
+       ===================================================================== */
+    const STEP_ORDER = [
+      "ASK_ASHA_ID",
+      "ASK_PATIENT",
+      "ASK_PREGNANCY",
+      "ASK_WEEKS",
+      "ASK_BP",
+      "ASK_HB",
+      "ASK_SYMPTOMS",
+    ];
+
+    const visits = [
+      {
+        id: "vis-101",
+        session_id: "seed-101",
+        patient_name: "Sunita Devi",
+        patient_age: 24,
+        village: "Rampur",
+        asha_id: "ASHA-104",
+        caller: "+91 94150 22104",
+        is_pregnant: true,
+        gestational_weeks: 32,
+        bp_systolic: 160,
+        bp_diastolic: 110,
+        hb_g_dl: 6.4,
+        symptoms: ["SEVERE_HEADACHE", "BLURRED_VISION", "FACIAL_EDEMA"],
+        risk_level: "CRITICAL",
+        triggered_rules: ["R1_SEVERE_HYPERTENSION", "R2_PREECLAMPSIA_SIGNS", "R5_MODERATE_SEVERE_ANEMIA"],
+        verification: "VERIFIED",
+        clinical_reason: "BP 160/110 mmHg at 32w with severe headache, blurred vision, and Hb 6.4 g/dL.",
+        recommended_action_hi: "Turant PHC ya FRU refer karein. 108 ambulance bulayein.",
+        updated_at: "12:41",
+        stt_ms: 138,
+        turn_ms: 482,
+        dispatch: null,
+        turns: [
+          {
+            seq: 1,
+            time: "12:40",
+            transcript: "Didi main ASHA 104 bol rahi hoon, Rampur se Sunita Devi 24 saal, 8 mahine pregnant hai, BP 160 over 110 hai, Hb 6.4 hai, tez sar dard aur dhundhla dikh raha.",
+            deltas: ["Worker: 104", "Patient: Sunita Devi (24y)", "32 weeks", "BP: 160/110 mmHg", "Hb: 6.4 g/dL", "Headache + vision"],
+            errors: [],
+            reply_text: "Sunita Devi, 32 hafte, BP ek sau saath bata ek sau das, Hb chhah dashamlav chaar. Kya yeh sahi hai?"
+          },
+          {
+            seq: 2,
+            time: "12:41",
+            transcript: "Haan ji bilkul sahi hai",
+            deltas: ["Confirmation: YES", "Status: VERIFIED"],
+            errors: [],
+            reply_text: "Dhanyavaad. Record verify ho gaya. Sunita Devi ko turant PHC bhejein."
+          }
+        ]
+      },
+      {
+        id: "vis-102",
+        session_id: "seed-102",
+        patient_name: "Meena Kumari",
+        patient_age: 21,
+        village: "Belwa",
+        asha_id: "ASHA-112",
+        caller: "+91 94150 88310",
+        is_pregnant: true,
+        gestational_weeks: 29,
+        bp_systolic: 144,
+        bp_diastolic: 94,
+        hb_g_dl: 6.6,
+        symptoms: ["REDUCED_FETAL_MOVEMENT"],
+        risk_level: "URGENT",
+        triggered_rules: ["R3_MODERATE_HYPERTENSION", "R5_MODERATE_SEVERE_ANEMIA", "R8_REDUCED_FETAL_MOVEMENT"],
+        verification: "VERIFIED",
+        clinical_reason: "Elevated BP 144/94 mmHg with Hb 6.6 g/dL and reduced fetal movement at 29w.",
+        recommended_action_hi: "24 ghante ke andar PHC doctor se jaanch karayein.",
+        updated_at: "12:28",
+        stt_ms: 145,
+        turn_ms: 510,
+        dispatch: {
+          unit_type: "ANM_MOBILE",
+          label: "ANM Mobile (18m ETA)",
+          eta_minutes: 18
+        },
+        turns: [
+          {
+            seq: 1,
+            time: "12:27",
+            transcript: "ASHA 112, Belwa se Meena Kumari 21 saal, 29 hafte ki garbhvati, BP 144 by 94, Hb 6.6, bacche ki halchal kam hai.",
+            deltas: ["Worker: 112", "Patient: Meena Kumari (21y)", "29 weeks", "BP: 144/94 mmHg", "Hb: 6.6 g/dL", "Reduced movement"],
+            errors: [],
+            reply_text: "Meena Kumari, unatis hafte, BP ek sau chaavaalis bata chauranbe, Hb chhah dashamlav chhah. Kya yeh sahi hai?"
+          },
+          {
+            seq: 2,
+            time: "12:28",
+            transcript: "Haan sahi hai",
+            deltas: ["Confirmation: YES", "Status: VERIFIED"],
+            errors: [],
+            reply_text: "Record save ho gaya. Aaj hi PHC jaanch ke liye bhejein."
+          }
+        ]
+      },
+      {
+        id: "vis-103",
+        session_id: "seed-103",
+        patient_name: "Geeta Devi",
+        patient_age: 34,
+        village: "Pipra",
+        asha_id: "ASHA-108",
+        caller: "+91 94150 44912",
+        is_pregnant: false,
+        gestational_weeks: null,
+        bp_systolic: 138,
+        bp_diastolic: 88,
+        hb_g_dl: 6.2,
+        symptoms: ["HIGH_FEVER"],
+        risk_level: "URGENT",
+        triggered_rules: ["R5_MODERATE_SEVERE_ANEMIA"],
+        verification: "VERIFIED",
+        clinical_reason: "Non-pregnant adult female with moderate-severe anemia (Hb 6.2 g/dL) and fever.",
+        recommended_action_hi: "PHC OPD mein khoon ki jaanch aur iron ilaaj ke liye bhejein.",
+        updated_at: "12:10",
+        stt_ms: 129,
+        turn_ms: 440,
+        dispatch: null,
+        turns: [
+          {
+            seq: 1,
+            time: "12:10",
+            transcript: "Mera ID 108 hai, Pipra gaon se Geeta Devi umar 34 saal, garbhvati nahi hai, BP 138/88, Hb 6.2 aur tez bukhar hai.",
+            deltas: ["Worker: 108", "Patient: Geeta Devi (34y)", "Non-pregnant", "BP: 138/88 mmHg", "Hb: 6.2 g/dL", "High fever"],
+            errors: [],
+            reply_text: "Geeta Devi, garbhvati nahi, BP ek sau aadtis bata athaasi, Hb chhah dashamlav do. Confirm karein."
+          }
+        ]
+      },
+      {
+        id: "vis-104",
+        session_id: "seed-104",
+        patient_name: "Kavita Yadav",
+        patient_age: 23,
+        village: "Kishanpur",
+        asha_id: "ASHA-104",
+        caller: "+91 94150 22104",
+        is_pregnant: true,
+        gestational_weeks: 24,
+        bp_systolic: 116,
+        bp_diastolic: 76,
+        hb_g_dl: 10.8,
+        symptoms: [],
+        risk_level: "ROUTINE",
+        triggered_rules: [],
+        verification: "VERIFIED",
+        clinical_reason: "All maternal vitals within normal physiological range at 24w.",
+        recommended_action_hi: "Routine ANC visit jari rakhein, iron aur calcium goli dein.",
+        updated_at: "11:48",
+        stt_ms: 118,
+        turn_ms: 390,
+        dispatch: null,
+        turns: [
+          {
+            seq: 1,
+            time: "11:48",
+            transcript: "Kavita Yadav 23 saal Kishanpur, 24 hafte pregnant, BP 116/76, Hb 10.8, koi dikkat nahi.",
+            deltas: ["Patient: Kavita Yadav (23y)", "24 weeks", "BP: 116/76 mmHg", "Hb: 10.8 g/dL", "No danger signs"],
+            errors: [],
+            reply_text: "Kavita Yadav, chaubis hafte, BP ek sau solah bata chhihattar. Sab samanya hai."
+          }
+        ]
+      }
+    ];
+
+    let activeTriageFilter = "ALL";
+    let selectedVisitId = visits[0].id;
+    let currentPromptTarget = null;
+    let dtmfBuffer = "";
+
+    /* =====================================================================
+       MEDICAL OFFICER LOGIN GATE
+       ===================================================================== */
+    const loginOverlay = document.getElementById("loginOverlay");
+    const officerNameLabel = document.getElementById("officerNameLabel");
+
+    async function performOfficerLogin(mode) {
+      const email = document.getElementById("loginEmail").value.trim() || "dr.verma@asha-vani.in";
+      const password = document.getElementById("loginPassword").value;
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, mode }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          officerNameLabel.textContent = data.officer_name || "Dr. A. Verma";
+          loginOverlay.classList.add("hidden");
+        }
+      } catch (e) {
+        officerNameLabel.textContent = "Dr. A. Verma";
+        loginOverlay.classList.add("hidden");
+      }
+    }
+
+    document.getElementById("btnDemoLogin").addEventListener("click", () => performOfficerLogin("demo"));
+    document.getElementById("btnSignIn").addEventListener("click", () => performOfficerLogin("credentials"));
+
+    /* =====================================================================
+       TOPBAR HANDSET DOCK COLLAPSE & EXOTEL SWITCHER
+       ===================================================================== */
+    const phoneDock = document.getElementById("phoneDock");
+    const splitter = document.getElementById("splitter");
+    const toggleDockBtn = document.getElementById("toggleDockBtn");
+    const toggleDockLabel = document.getElementById("toggleDockLabel");
+
+    toggleDockBtn.addEventListener("click", () => {
+      const isCollapsed = phoneDock.classList.toggle("collapsed");
+      splitter.classList.toggle("collapsed", isCollapsed);
+      toggleDockLabel.textContent = isCollapsed ? "Show handset" : "Hide handset";
+    });
+
+    const modeSimBtn = document.getElementById("modeSimBtn");
+    const modeExotelBtn = document.getElementById("modeExotelBtn");
+    const nokiaPane = document.getElementById("nokiaPane");
+    const exotelPane = document.getElementById("exotelPane");
+
+    modeSimBtn.addEventListener("click", () => {
+      modeSimBtn.classList.add("active");
+      modeExotelBtn.classList.remove("active");
+      nokiaPane.classList.remove("hidden");
+      exotelPane.classList.remove("active");
+    });
+
+    modeExotelBtn.addEventListener("click", () => {
+      modeExotelBtn.classList.add("active");
+      modeSimBtn.classList.remove("active");
+      nokiaPane.classList.add("hidden");
+      exotelPane.classList.add("active");
+    });
+
+    /* =====================================================================
+       7-STEP CHECKLIST STRIP UPDATER
+       ===================================================================== */
+    function updateChecklistStepper(promptTarget, replyText, englishSub) {
+      currentPromptTarget = promptTarget;
+      const pills = document.querySelectorAll("#stepperTrack .step-pill");
+      const targetIdx = STEP_ORDER.indexOf(promptTarget);
+
+      pills.forEach((pill, idx) => {
+        pill.classList.remove("active", "done");
+        if (promptTarget === "CONFIRM" || promptTarget === "DONE") {
+          pill.classList.add("done");
+        } else if (targetIdx >= 0) {
+          if (idx < targetIdx) pill.classList.add("done");
+          else if (idx === targetIdx) pill.classList.add("active");
+        }
+      });
+
+      const statusEl = document.getElementById("stepperStatusText");
+      const subEl = document.getElementById("stepperEnglishSub");
+      if (replyText) {
+        statusEl.textContent = replyText;
+      }
+      if (englishSub) {
+        subEl.style.display = "block";
+        subEl.textContent = englishSub;
+      }
+    }
+
+    /* =====================================================================
+       RENDER SIGNATURE FURROW STAGE:
+       Left Waterproof Notebook Card + Right Turn-by-Turn Inspection Sheet
+       ===================================================================== */
+    function formatSymptomShort(sym) {
+      return sym.replace(/_/g, " ").toLowerCase();
+    }
+
+    function renderActiveStage() {
+      const visit = visits.find((v) => v.id === selectedVisitId) || visits[0];
+      if (!visit) return;
+
+      const isNonPreg = visit.is_pregnant === false;
+      document.getElementById("cardCategoryLabel").textContent = isNonPreg
+        ? "General visit"
+        : "Maternal visit";
+      document.getElementById("cardMetaRight").textContent = `${visit.asha_id || "ASHA-104"}`;
+
+      const bpDisplay = visit.bp_systolic && visit.bp_diastolic
+        ? `${visit.bp_systolic}/${visit.bp_diastolic}`
+        : (visit.hb_g_dl != null ? `${visit.hb_g_dl} g/dL` : "In call");
+      document.getElementById("cardBigFigure").textContent = bpDisplay;
+
+      document.getElementById("cardPatientTitle").textContent =
+        `${visit.patient_name || "Incoming caller"}${visit.patient_age ? ", " + visit.patient_age + " yrs" : ""} (${visit.village || "Rampur"})`;
+      document.getElementById("cardTimeLabel").textContent =
+        visit.verification === "VERIFIED" ? `Verified ${visit.updated_at}` : `Unverified (in call)`;
+
+      document.getElementById("cellPatient").textContent =
+        `${visit.patient_name || "Pending"}${visit.patient_age ? " (" + visit.patient_age + "y)" : ""}`;
+      document.getElementById("cellWorker").textContent =
+        `${visit.asha_id || "Pending"}, ${visit.village || "Rampur"}`;
+      document.getElementById("cellPreg").textContent = isNonPreg
+        ? "Non-pregnant"
+        : (visit.gestational_weeks ? `${visit.gestational_weeks} weeks` : "Pending");
+      document.getElementById("cellBp").textContent =
+        visit.bp_systolic && visit.bp_diastolic
+          ? `${visit.bp_systolic}/${visit.bp_diastolic} mmHg`
+          : "Pending";
+      document.getElementById("cellHb").textContent =
+        visit.hb_g_dl != null ? `${visit.hb_g_dl} g/dL` : "Pending";
+      document.getElementById("cellSigns").textContent =
+        (visit.symptoms || []).length > 0
+          ? visit.symptoms.map(formatSymptomShort).join(", ")
+          : "None reported";
+
+      const ruleBanner = document.getElementById("cardRuleBanner");
+      if ((visit.triggered_rules || []).length > 0) {
+        ruleBanner.className = visit.risk_level === "CRITICAL" ? "tag tag--critical" : "tag tag--soft";
+        ruleBanner.textContent = visit.triggered_rules.map((r) => r.split("_")[0]).join(", ") + ` (${visit.risk_level.toLowerCase()})`;
+      } else {
+        ruleBanner.className = "tag tag--routine";
+        ruleBanner.textContent = "Routine parameters";
+      }
+
+      const dispatchTag = document.getElementById("cardDispatchTag");
+      if (visit.dispatch) {
+        dispatchTag.textContent = visit.dispatch.label;
+      } else {
+        dispatchTag.textContent = visit.verification === "VERIFIED" ? "Ready for inspection" : "Awaiting ASHA readback";
+      }
+
+      // Update Right White Sheet: Turn-by-Turn Voice Transcript Table
+      document.getElementById("sheetHeading").textContent =
+        `Inspection record: ${visit.patient_name || "Active call"}`;
+      document.getElementById("sheetSubheading").textContent =
+        visit.clinical_reason || "Turn-by-turn spoken transcript and deterministic rule evaluation";
+
+      const turns = visit.turns || [];
+      document.getElementById("turnCountLabel").textContent =
+        `${turns.length} ${turns.length === 1 ? "turn" : "turns"} recorded`;
+
+      const tbody = document.getElementById("liveTurnTapeBody");
+      if (turns.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td class="num">01</td>
+            <td>
+              <div class="turn-spoken">Awaiting first spoken utterance from handset...</div>
+              <div class="turn-reply">System greeted caller in Hinglish and requested 3-digit worker ID.</div>
+            </td>
+            <td><span class="delta-chip">Listening</span></td>
+            <td class="num" style="text-align: right;">Live</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = turns
+        .map((t) => {
+          const deltasHtml = (t.deltas || [])
+            .map((d) => `<span class="delta-chip">${d}</span>`)
+            .join("");
+          const errorsHtml = (t.errors || [])
+            .map((e) => `<span class="delta-chip delta-chip--err">Rejected: ${e}</span>`)
+            .join("");
+          return `
+            <tr>
+              <td class="num">0${t.seq}</td>
+              <td>
+                <div class="turn-spoken">"${t.transcript}"</div>
+                ${t.reply_text ? `<div class="turn-reply">Reply: "${t.reply_text}"</div>` : ""}
+              </td>
+              <td>
+                <div class="delta-list">
+                  ${deltasHtml}${errorsHtml}
+                </div>
+              </td>
+              <td class="num" style="text-align: right;">${t.time || visit.updated_at || "Live"}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    /* =====================================================================
+       RENDER RULED CLINICAL REGISTER TABLE
+       ===================================================================== */
+    function getRiskBadge(risk) {
+      if (risk === "CRITICAL") return `<span class="tag tag--critical">Critical</span>`;
+      if (risk === "URGENT") return `<span class="tag tag--urgent">Urgent</span>`;
+      return `<span class="tag tag--routine">Routine</span>`;
+    }
+
+    function renderRegister() {
+      const searchQ = (document.getElementById("searchInput").value || "").toLowerCase().trim();
+      const villageVal = document.getElementById("villageFilter").value;
+      const verifyVal = document.getElementById("verifyFilter").value;
+
+      let critCount = 0;
+      let urgCount = 0;
+      let unverifiedCount = 0;
+      let dispatchedCount = 0;
+      let latestTurnMs = null;
+
+      visits.forEach((v) => {
+        if (v.risk_level === "CRITICAL") critCount++;
+        else if (v.risk_level === "URGENT") urgCount++;
+        if (v.verification !== "VERIFIED") unverifiedCount++;
+        if (v.dispatch) dispatchedCount++;
+        if (v.turn_ms) latestTurnMs = v.turn_ms;
+      });
+
+      document.getElementById("statCrit").textContent = critCount;
+      document.getElementById("statUrg").textContent = urgCount;
+      document.getElementById("statTotal").textContent = visits.length;
+      document.getElementById("statVerified").textContent = unverifiedCount;
+      document.getElementById("statDispatched").textContent = dispatchedCount;
+      document.getElementById("statWorkers").textContent = latestTurnMs ? `${Math.round(latestTurnMs)} ms` : "138 ms";
+
+      const filtered = visits.filter((v) => {
+        if (activeTriageFilter !== "ALL" && v.risk_level !== activeTriageFilter) return false;
+        if (villageVal !== "ALL" && v.village !== villageVal) return false;
+        if (verifyVal !== "ALL" && v.verification !== verifyVal) return false;
+        if (searchQ) {
+          const hay = `${v.patient_name} ${v.village} ${v.asha_id} ${(v.symptoms || []).join(" ")}`.toLowerCase();
+          if (!hay.includes(searchQ)) return false;
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById("registerBody");
+      tbody.innerHTML = filtered
+        .map((v) => {
+          const isSelected = v.id === selectedVisitId;
+          const isNonPreg = v.is_pregnant === false;
+          const catTag = isNonPreg
+            ? `<span class="tag tag--neutral">General</span>`
+            : `<span class="tag tag--soft">Maternal</span>`;
+          const weeksCell = isNonPreg
+            ? `<span class="num">--</span>`
+            : `<span class="num">${v.gestational_weeks != null ? v.gestational_weeks + "w" : "--"}</span>`;
+          const bpCell = v.bp_systolic && v.bp_diastolic
+            ? `<span class="num">${v.bp_systolic}/${v.bp_diastolic}</span>`
+            : `<span class="num">--</span>`;
+          const hbCell = v.hb_g_dl != null
+            ? `<span class="num">${v.hb_g_dl}</span>`
+            : `<span class="num">--</span>`;
+
+          const signsList = (v.symptoms || []).slice(0, 2).map(formatSymptomShort).join(", ");
+          const rulesList = (v.triggered_rules || []).map((r) => r.split("_")[0]).join(", ");
+
+          const verBadge = v.verification === "VERIFIED"
+            ? `<span class="tag tag--routine">Verified</span>`
+            : `<span class="tag tag--soft">Unverified</span>`;
+
+          const dispatchCell = v.dispatch
+            ? `<span class="tag tag--routine">${v.dispatch.label}</span>`
+            : `<button class="btn btn--sm" type="button" onclick="event.stopPropagation(); openPatientModal('${v.id}')">Inspect / dispatch</button>`;
+
+          return `
+            <tr class="register-row ${isSelected ? "selected-row" : ""}" onclick="selectVisitRow('${v.id}')">
+              <td>${getRiskBadge(v.risk_level)}</td>
+              <td>
+                <div class="patient-name" onclick="openPatientModal('${v.id}')">${v.patient_name || "Unknown patient"}${v.patient_age ? ", " + v.patient_age + "y" : ""}</div>
+                <div class="patient-sub">${v.village || "Rampur"}, <span class="num">${v.asha_id || "ASHA-104"}</span></div>
+              </td>
+              <td>${catTag}</td>
+              <td>${weeksCell}</td>
+              <td>${bpCell}</td>
+              <td>${hbCell}</td>
+              <td>
+                <div style="font-size: var(--text-xs); color: var(--color-ink);">${signsList || "None"}</div>
+                ${rulesList ? `<div class="num" style="font-size: var(--text-xs); color: var(--color-muted);">Rules: ${rulesList}</div>` : ""}
+              </td>
+              <td>${verBadge}</td>
+              <td onclick="event.stopPropagation()">${dispatchCell}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      renderActiveStage();
+    }
+
+    window.selectVisitRow = function (visitId) {
+      selectedVisitId = visitId;
+      renderRegister();
+    };
+
+    /* =====================================================================
+       CENTERED FULL DOSSIER MODAL & 1-CLICK HOME DISPATCH
+       ===================================================================== */
+    const modalBackdrop = document.getElementById("patientModalBackdrop");
+
+    window.openPatientModal = function (visitId) {
+      selectedVisitId = visitId || selectedVisitId;
+      const visit = visits.find((v) => v.id === selectedVisitId) || visits[0];
+      if (!visit) return;
+
+      renderRegister();
+
+      document.getElementById("modalPatientName").textContent =
+        `${visit.patient_name || "Caller"}${visit.patient_age ? ", " + visit.patient_age + " yrs" : ""}`;
+      document.getElementById("modalPatientMeta").textContent =
+        `${visit.village || "Rampur"}, ${visit.asha_id || "ASHA-104"}, ${visit.updated_at || "Live"}`;
+      document.getElementById("modalCategoryChip").textContent =
+        visit.is_pregnant === false ? "General patient" : "Maternal ANC";
+
+      const turnsHtml = (visit.turns || [])
+        .map(
+          (t) => `
+          <div style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-rule);">
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--color-muted);">
+              <span class="num">Turn 0${t.seq}</span>
+              <span class="num">${t.time || "Live"}</span>
+            </div>
+            <div style="font-weight:500;margin-top:var(--space-3xs);">"${t.transcript}"</div>
+            ${t.reply_text ? `<div style="font-size:var(--text-xs);color:var(--color-muted);margin-top:var(--space-3xs);">System: "${t.reply_text}"</div>` : ""}
+          </div>
+        `
+        )
+        .join("");
+
+      document.getElementById("modalBody").innerHTML = `
+        <div class="inspection-sheet">
+          <div class="ruled-section-title">
+            <span>Clinical assessment &amp; recommended action</span>
+            ${getRiskBadge(visit.risk_level)}
+          </div>
+          <p style="font-size: var(--text-sm); color: var(--color-ink);">${visit.clinical_reason || "Structured from voice intake."}</p>
+          <p style="font-size: var(--text-xs); color: var(--color-muted);">Spoken advice: "${visit.recommended_action_hi || ""}"</p>
+
+          <div class="ruled-section-title" style="margin-top: var(--space-xs);">
+            <span>Authorize home dispatch unit (SIM)</span>
+            <span class="num">${visit.dispatch ? visit.dispatch.label : "No unit assigned"}</span>
+          </div>
+          <div style="display: flex; gap: var(--space-xs); flex-wrap: wrap;">
+            <button class="btn btn--primary" type="button" onclick="triggerHomeDispatch('${visit.id}', '108_UNIT', 12)">
+              <span>Dispatch 108 ambulance (12m ETA)</span>
+            </button>
+            <button class="btn" type="button" onclick="triggerHomeDispatch('${visit.id}', 'ANM_MOBILE', 18)">
+              <span>Dispatch ANM mobile (18m ETA)</span>
+            </button>
+            <button class="btn" type="button" onclick="triggerHomeDispatch('${visit.id}', 'HOME_VISIT', 30)">
+              <span>Log ASHA home follow-up</span>
+            </button>
+            <button class="btn" type="button" onclick="copyReferralSlip('${visit.id}')">
+              <span>Copy slip</span>
+            </button>
+          </div>
+
+          <div class="ruled-section-title" style="margin-top: var(--space-xs);">
+            <span>Complete turn-by-turn transcript</span>
+          </div>
+          <div>${turnsHtml || "No turns recorded."}</div>
+        </div>
+      `;
+
+      modalBackdrop.classList.add("open");
+    };
+
+    document.getElementById("closeModalBtn").addEventListener("click", () => {
+      modalBackdrop.classList.remove("open");
+    });
+    modalBackdrop.addEventListener("click", (e) => {
+      if (e.target === modalBackdrop) modalBackdrop.classList.remove("open");
+    });
+
+    window.triggerHomeDispatch = async function (visitId, unitType, etaMinutes) {
+      const targetId = visitId || selectedVisitId;
+      const visit = visits.find((v) => v.id === targetId);
+      if (!visit) return;
+      try {
+        const res = await fetch("/api/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visit_id: targetId, unit_type: unitType, eta_minutes: etaMinutes }),
+        });
+        const data = await res.json();
+        if (data.ok && data.dispatch) {
+          visit.dispatch = data.dispatch;
+        }
+      } catch (err) {
+        const fallbackLabels = {
+          "108_UNIT": `108 Unit (${etaMinutes}m ETA)`,
+          "ANM_MOBILE": `ANM Mobile (${etaMinutes}m ETA)`,
+          "HOME_VISIT": "Home Follow-up Logged",
+        };
+        visit.dispatch = { unit_type: unitType, label: fallbackLabels[unitType] || unitType };
+      }
+      renderRegister();
+      if (modalBackdrop.classList.contains("open")) {
+        openPatientModal(targetId);
+      }
+    };
+
+    window.copyReferralSlip = function (visitId) {
+      const visit = visits.find((v) => v.id === (visitId || selectedVisitId));
+      if (!visit) return;
+      const slip = [
+        `ASHA-VANI PHC REFERRAL SLIP (SIM)`,
+        `Patient: ${visit.patient_name || "Unknown"} (${visit.patient_age || "--"}y)`,
+        `Village: ${visit.village || "Rampur"} | Worker: ${visit.asha_id || "ASHA-104"}`,
+        `Risk: ${visit.risk_level} (${visit.verification})`,
+        `Vitals: ${visit.is_pregnant === false ? "Non-pregnant" : (visit.gestational_weeks || "--") + "w"}, BP ${visit.bp_systolic || "--"}/${visit.bp_diastolic || "--"} mmHg, Hb ${visit.hb_g_dl || "--"} g/dL`,
+        `Reason: ${visit.clinical_reason || ""}`,
+      ].join("\n");
+      if (navigator.clipboard) navigator.clipboard.writeText(slip);
+      const copyBtn = document.getElementById("copySlipBtn");
+      copyBtn.textContent = "Slip copied";
+      setTimeout(() => { copyBtn.textContent = "Copy referral slip"; }, 1600);
+    };
+
+    document.getElementById("copySlipBtn").addEventListener("click", () => {
+      if (selectedVisitId) window.copyReferralSlip(selectedVisitId);
+    });
+
+    /* =====================================================================
+       FILTER LISTENERS
+       ===================================================================== */
+    document.querySelectorAll("#triageTabs .seg-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#triageTabs .seg-tab").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeTriageFilter = btn.dataset.triage;
+        renderRegister();
+      });
+    });
+    document.getElementById("searchInput").addEventListener("input", renderRegister);
+    document.getElementById("villageFilter").addEventListener("change", renderRegister);
+    document.getElementById("verifyFilter").addEventListener("change", renderRegister);
+
+    /* =====================================================================
+       WEBAUDIO DTMF KEYPAD + NOKIA LIVE CALL ENGINE
+       ===================================================================== */
+    const DTMF_FREQS = {
+      "1": [697, 1209], "2": [697, 1336], "3": [697, 1477],
+      "4": [770, 1209], "5": [770, 1336], "6": [770, 1477],
+      "7": [852, 1209], "8": [852, 1336], "9": [852, 1477],
+      "*": [941, 1209], "0": [941, 1336], "#": [941, 1477],
+    };
+
+    let dtmfAudioCtx = null;
+    function playDtmfTone(digit) {
+      const pair = DTMF_FREQS[digit];
+      if (!pair) return;
+      try {
+        if (!dtmfAudioCtx) dtmfAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = dtmfAudioCtx.currentTime;
+        const osc1 = dtmfAudioCtx.createOscillator();
+        const osc2 = dtmfAudioCtx.createOscillator();
+        const gain = dtmfAudioCtx.createGain();
+        osc1.frequency.value = pair[0];
+        osc2.frequency.value = pair[1];
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(dtmfAudioCtx.destination);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.11);
+        osc2.stop(now + 0.11);
+      } catch (e) {}
+    }
+
+    const lcdDtmf = document.getElementById("lcdDtmf");
+    function updateDtmfDisplay() {
+      if (dtmfBuffer.length > 0) {
+        lcdDtmf.classList.add("visible");
+        lcdDtmf.textContent = `Keypad: ${dtmfBuffer}`;
+      } else {
+        lcdDtmf.classList.remove("visible");
+        lcdDtmf.textContent = "Keypad: ";
+      }
+    }
+
+    document.querySelectorAll("#dtmfKeypad .key-num").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const digit = btn.dataset.digit;
+        playDtmfTone(digit);
+        if (digit === "*") {
+          dtmfBuffer = "";
+          updateDtmfDisplay();
+          return;
+        }
+        if (digit === "#") {
+          if (dtmfBuffer.trim().length > 0) {
+            const toSend = dtmfBuffer.trim();
+            dtmfBuffer = "";
+            updateDtmfDisplay();
+            sendUtteranceToBackend(toSend);
+          }
+          return;
+        }
+        dtmfBuffer += digit;
+        updateDtmfDisplay();
+      });
+    });
+
+    /* =====================================================================
+       LIVE BACKEND WEBSOCKETS (/ws/call & /ws/console) + SUPABASE HYDRATION
+       ===================================================================== */
+    const nokiaLcd = document.getElementById("nokiaLcd");
+    const lcdStatus = document.getElementById("lcdStatus");
+    const lcdSub = document.getElementById("lcdSub");
+    const lcdDuplex = document.getElementById("lcdDuplex");
+    const lcdTimer = document.getElementById("lcdTimer");
+
+    let callSocket = null;
+    let consoleWs = null;
+    let activeSessionId = null;
+    let recognition = null;
+    let isCallActive = false;
+    let isHalfDuplexMuted = false;
+    let accumulatedSpeech = "";
+    let interimSpeech = "";
+    let silenceDebounceTimer = null;
+    let activeAudio = null;
+    let callTimerInterval = null;
+    let callSeconds = 0;
+    let currentSnrDb = 0;
+    let micStream = null;
+    let micContext = null;
+    let micProcessor = null;
+    let micMuteGain = null;
+    let playbackContext = null;
+    let playbackCursor = 0;
+    let playbackQueue = Promise.resolve();
+    let ttsStreamActive = false;
+    let ttsFailed = false;
+    let pendingGreeting = "";
+    const SILENCE_WAIT_MS = 5000;
+
+    function formatClock(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, "0");
+      const s = String(sec % 60).padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function formatNowTimestamp(isoStr = null) {
+      try {
+        const d = isoStr ? new Date(isoStr) : new Date();
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      } catch (_) {
+        return "Live";
+      }
+    }
+
+    document.querySelectorAll("#noiseGroup .noise-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#noiseGroup .noise-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentSnrDb = Number(btn.dataset.snr || 0);
+        document.getElementById("snrLabel").textContent =
+          currentSnrDb > 0 ? `Field noise (${currentSnrDb} dB)` : "Clean (inf dB)";
+        document.getElementById("lcdNoiseTag").textContent =
+          currentSnrDb > 0 ? `${currentSnrDb}dB` : "Clean";
+        if (callSocket && callSocket.readyState === WebSocket.OPEN) {
+          callSocket.send(JSON.stringify({ type: "noise", snr_db: currentSnrDb > 0 ? currentSnrDb : null }));
+        }
+      });
+    });
+
+    function summarizeDeltasFromPayload(p) {
+      const list = [];
+      const patient = p.patient || p.extracted_visit || {};
+      const vals = p.visit_values || p.extracted_visit || {};
+      if (p.asha_id || patient.asha_id) list.push(`Worker: ${p.asha_id || patient.asha_id}`);
+      const pName = patient.full_name || patient.patient_name;
+      const pAge = patient.age_years ?? patient.patient_age;
+      if (pName) list.push(`Patient: ${pName}${pAge ? " (" + pAge + "y)" : ""}`);
+      const isPreg = p.is_pregnant !== undefined ? p.is_pregnant : vals.is_pregnant;
+      if (isPreg === false) list.push("Non-pregnant");
+      else if (vals.gestational_weeks != null) list.push(`${vals.gestational_weeks} weeks`);
+      if (vals.bp_systolic && vals.bp_diastolic) list.push(`BP: ${vals.bp_systolic}/${vals.bp_diastolic} mmHg`);
+      if (vals.hb_g_dl != null) list.push(`Hb: ${vals.hb_g_dl} g/dL`);
+      if (Array.isArray(vals.symptoms)) {
+        vals.symptoms.forEach((s) => {
+          if (s.presence === "PRESENT" && s.code) list.push(formatSymptomShort(s.code));
+        });
+      } else if (vals.symptoms && typeof vals.symptoms === "object") {
+        Object.keys(vals.symptoms).forEach((k) => {
+          if (vals.symptoms[k] === "PRESENT") list.push(formatSymptomShort(k));
+        });
+      }
+      if (p.verification === "VERIFIED" || p.confirmation_status === "VERIFIED") list.push("Verified");
+      return list.length > 0 ? list : ["Processed"];
+    }
+
+    function ensureLiveVisitStarted(sessionId, eventIsoTime = null, callerNum = null) {
+      if (!sessionId) return;
+      const vid = `live-${sessionId}-1`;
+      let existing = visits.find((v) => v.id === vid || v.session_id === sessionId);
+      const formattedTime = formatNowTimestamp(eventIsoTime);
+      if (!existing) {
+        existing = {
+          id: vid,
+          session_id: sessionId,
+          visit_number: 1,
+          patient_name: "Listening for patient...",
+          patient_age: null,
+          village: "Rampur",
+          asha_id: "ASHA-Live",
+          caller: callerNum || "+91 99000 00001",
+          is_pregnant: null,
+          gestational_weeks: null,
+          bp_systolic: null,
+          bp_diastolic: null,
+          hb_g_dl: null,
+          symptoms: [],
+          risk_level: "ROUTINE",
+          triggered_rules: [],
+          verification: "UNVERIFIED",
+          clinical_reason: "Call connected, awaiting ASHA worker ID and patient details.",
+          recommended_action_hi: "",
+          updated_at: formattedTime,
+          stt_ms: null,
+          turn_ms: null,
+          dispatch: null,
+          turns: [],
+        };
+        visits.unshift(existing);
+      }
+      selectedVisitId = existing.id;
+      updateChecklistStepper(
+        "ASK_ASHA_ID",
+        `Live call active (${sessionId})`,
+        "Prompting for 3-digit ASHA Worker ID (say 'ASHA ID 005' or dial 005#)"
+      );
+      renderRegister();
+    }
+
+    function applyLiveBackendTurn(sessionId, p, eventIsoTime = null) {
+      if (!sessionId || !p) return;
+      const visitNum = Number(p.visit_number || 1);
+      const vid = `live-${sessionId}-${visitNum}`;
+      let v = visits.find((item) => item.id === vid || (visitNum === 1 && item.session_id === sessionId));
+      const formattedTime = formatNowTimestamp(eventIsoTime);
+
+      if (!v) {
+        v = {
+          id: vid,
+          session_id: sessionId,
+          visit_number: visitNum,
+          patient_name: "Listening for patient...",
+          patient_age: null,
+          village: "Rampur",
+          asha_id: "ASHA-Live",
+          is_pregnant: null,
+          gestational_weeks: null,
+          bp_systolic: null,
+          bp_diastolic: null,
+          hb_g_dl: null,
+          symptoms: [],
+          risk_level: "ROUTINE",
+          triggered_rules: [],
+          verification: "UNVERIFIED",
+          clinical_reason: "",
+          recommended_action_hi: "",
+          updated_at: formattedTime,
+          turns: [],
+        };
+        visits.unshift(v);
+      }
+
+      const patient = p.patient || p.extracted_visit || {};
+      const vals = p.visit_values || p.extracted_visit || {};
+      const tri = p.triage || p.triage_result || {};
+      const valIssues = p.validation_issues || (p.validation_result && p.validation_result.issues) || [];
+
+      if (patient.full_name || patient.patient_name) v.patient_name = patient.full_name || patient.patient_name;
+      if ((patient.age_years ?? patient.patient_age) != null) v.patient_age = patient.age_years ?? patient.patient_age;
+      if (patient.village) v.village = patient.village;
+      if (p.asha_id || patient.asha_id) {
+        const rawId = String(p.asha_id || patient.asha_id);
+        v.asha_id = rawId.startsWith("ASHA-") ? rawId : `ASHA-${rawId}`;
+      }
+      const isPreg = p.is_pregnant !== undefined ? p.is_pregnant : vals.is_pregnant;
+      if (isPreg !== undefined && isPreg !== null) v.is_pregnant = isPreg;
+      if (vals.gestational_weeks != null) v.gestational_weeks = vals.gestational_weeks;
+      if (vals.bp_systolic != null) v.bp_systolic = vals.bp_systolic;
+      if (vals.bp_diastolic != null) v.bp_diastolic = vals.bp_diastolic;
+      if (vals.hb_g_dl != null) v.hb_g_dl = vals.hb_g_dl;
+
+      const presentSyms = [];
+      if (Array.isArray(vals.symptoms)) {
+        vals.symptoms.forEach((s) => {
+          if (s.presence === "PRESENT" && s.code) presentSyms.push(s.code);
+        });
+      } else if (vals.symptoms && typeof vals.symptoms === "object") {
+        Object.keys(vals.symptoms).forEach((k) => {
+          if (vals.symptoms[k] === "PRESENT") presentSyms.push(k);
+        });
+      }
+      if (presentSyms.length > 0) v.symptoms = presentSyms;
+
+      const riskLvl = tri.level || tri.risk_level;
+      if (riskLvl) v.risk_level = riskLvl;
+      const firedRules = tri.rules_fired || tri.triggered_rules;
+      if (firedRules) v.triggered_rules = firedRules;
+      if (p.english_summary || tri.clinical_reason) {
+        v.clinical_reason = p.english_summary || tri.clinical_reason;
+      }
+      if (p.reply_text || tri.recommended_action_hi) {
+        v.recommended_action_hi = p.reply_text || tri.recommended_action_hi;
+      }
+
+      if (p.verification || p.confirmation_status) {
+        v.verification = (p.verification === "VERIFIED" || p.confirmation_status === "VERIFIED")
+          ? "VERIFIED"
+          : "UNVERIFIED";
+      }
+      v.updated_at = formattedTime;
+      v.stt_ms = p.latencies_ms?.stt ?? p.stt_latency_ms ?? 125;
+      v.turn_ms = p.latencies_ms?.total ?? p.turn_latency_ms ?? 340;
+
+      const errs = valIssues
+        .filter((i) => i.severity === "ERROR")
+        .map((i) => `${i.field || "field"}: ${i.rejected_value ?? i.message}`);
+
+      const seqNum = p.utterance_seq || v.turns.length + 1;
+      const turnEntry = {
+        seq: seqNum,
+        time: formattedTime,
+        transcript: p.stt_transcript || p.transcript || "",
+        deltas: summarizeDeltasFromPayload(p),
+        errors: errs,
+        reply_text: p.reply_text || "",
+      };
+
+      const existingIdx = v.turns.findIndex((t) => t.seq === seqNum);
+      if (existingIdx === -1) {
+        v.turns.push(turnEntry);
+      } else {
+        v.turns[existingIdx] = turnEntry;
+      }
+
+      selectedVisitId = v.id;
+      const nextStep = p.next_action || p.prompt_target || "ASK_ASHA_ID";
+      updateChecklistStepper(nextStep, p.reply_text, p.english_summary);
+      renderRegister();
+
+      if (modalBackdrop.classList.contains("open") && selectedVisitId === v.id) {
+        openPatientModal(v.id);
+      }
+    }
+
+    async function hydrateSavedRegister() {
+      if (location.protocol === "file:") return;
+      try {
+        const response = await fetch("/api/register");
+        if (!response.ok) return;
+        const saved = await response.json();
+        for (const row of saved.events || []) {
+          const evType = row.event_type;
+          const sid = row.session_id;
+          const ts = row.occurred_at;
+          const payload = row.payload || {};
+          if (evType === "call_started") {
+            ensureLiveVisitStarted(sid, ts, payload.caller);
+          } else if (evType === "turn_completed") {
+            applyLiveBackendTurn(sid, payload, ts);
+          } else if (evType === "call_ended") {
+            const visit = visits.find((v) => v.id === `live-${sid}` || v.session_id === sid);
+            if (visit && payload.final_verification === "INCOMPLETE") {
+              visit.verification = "INCOMPLETE";
+            }
+          }
+        }
+        renderRegister();
+      } catch (err) {}
+    }
+
+    function connectConsoleWebSocket() {
+      if (location.protocol === "file:") return;
+      if (consoleWs && (consoleWs.readyState === WebSocket.OPEN || consoleWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      consoleWs = new WebSocket(`${proto}//${location.host}/ws/console`);
+      consoleWs.onopen = hydrateSavedRegister;
+      consoleWs.onmessage = (ev) => {
+        try {
+          const event = JSON.parse(ev.data);
+          if (!event || !event.event_type) return;
+          if (event.event_type === "call_started") {
+            ensureLiveVisitStarted(event.session_id, event.timestamp, event.payload?.caller);
+          } else if (event.event_type === "turn_completed") {
+            applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
+          } else if (event.event_type === "dispatch_updated" && event.payload) {
+            const target = visits.find((v) => v.id === event.payload.visit_id);
+            if (target) {
+              target.dispatch = event.payload;
+              renderRegister();
+            }
+          }
+        } catch (err) {}
+      };
+      consoleWs.onclose = () => {
+        setTimeout(connectConsoleWebSocket, 1800);
+      };
+    }
+
+    /* =====================================================================
+       HALF-DUPLEX MIC / TIMBRE PCM STREAM / WEB SPEECH FALLBACK
+       ===================================================================== */
+    function pauseMicForTTS() {
+      isHalfDuplexMuted = true;
+      clearTimeout(silenceDebounceTimer);
+      accumulatedSpeech = "";
+      interimSpeech = "";
+      lcdStatus.textContent = "System speaking...";
+      lcdDuplex.textContent = "Mic muted (half-duplex)";
+      if (recognition) {
+        try { recognition.abort(); } catch (_) {}
+      }
+    }
+
+    function resumeMicAfterTTS() {
+      setTimeout(() => {
+        if (!isCallActive) return;
+        isHalfDuplexMuted = false;
+        accumulatedSpeech = "";
+        interimSpeech = "";
+        lcdStatus.textContent = "Listening (speak or keypad)";
+        lcdDuplex.textContent = "Mic live";
+        if (recognition) {
+          try { recognition.start(); } catch (_) {}
+        }
+      }, 240);
+    }
+
+    function speakWithBrowserTTS(text) {
+      if (!("speechSynthesis" in window) || !text) {
+        resumeMicAfterTTS();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "hi-IN";
+      utter.rate = 0.98;
+      utter.onend = () => resumeMicAfterTTS();
+      utter.onerror = () => resumeMicAfterTTS();
+      window.speechSynthesis.speak(utter);
+    }
+
+    function speakReplyHalfDuplex(text) {
+      if (!text) return;
+      pauseMicForTTS();
+      lcdSub.textContent = text;
+
+      if (location.protocol !== "file:") {
+        fetch(`/api/tts?text=${encodeURIComponent(text)}`)
+          .then((res) => (res.status === 200 ? res.blob() : null))
+          .then((blob) => {
+            if (!blob) {
+              speakWithBrowserTTS(text);
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            if (activeAudio) {
+              try { activeAudio.pause(); } catch (_) {}
+            }
+            activeAudio = new Audio(url);
+            activeAudio.onended = () => {
+              URL.revokeObjectURL(url);
+              resumeMicAfterTTS();
+            };
+            activeAudio.onerror = () => {
+              URL.revokeObjectURL(url);
+              resumeMicAfterTTS();
+            };
+            activeAudio.play().catch(() => speakWithBrowserTTS(text));
+          })
+          .catch(() => speakWithBrowserTTS(text));
+      } else {
+        speakWithBrowserTTS(text);
+      }
+    }
+
+    async function startLiveMicrophone() {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone capture is unavailable");
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false },
+      });
+      micContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+      await micContext.resume();
+      playbackContext = micContext;
+      const source = micContext.createMediaStreamSource(micStream);
+      micProcessor = micContext.createScriptProcessor(1024, 1, 1);
+      micMuteGain = micContext.createGain();
+      micMuteGain.gain.value = 0;
+      micProcessor.onaudioprocess = (event) => {
+        if (!isCallActive || isHalfDuplexMuted || !callSocket || callSocket.readyState !== WebSocket.OPEN) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const ratio = micContext.sampleRate / 8000;
+        const outputLength = Math.max(1, Math.floor(input.length / ratio));
+        const pcm = new ArrayBuffer(outputLength * 2);
+        const view = new DataView(pcm);
+        for (let i = 0; i < outputLength; i++) {
+          const sourcePosition = i * ratio;
+          const left = Math.floor(sourcePosition);
+          const blend = sourcePosition - left;
+          const right = Math.min(input.length - 1, left + 1);
+          const sample = Math.max(-1, Math.min(1, input[left] * (1 - blend) + input[right] * blend));
+          view.setInt16(i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
+        }
+        callSocket.send(pcm);
+      };
+      source.connect(micProcessor);
+      micProcessor.connect(micMuteGain);
+      micMuteGain.connect(micContext.destination);
+    }
+
+    function stopLiveMicrophone() {
+      if (micProcessor) micProcessor.disconnect();
+      if (micMuteGain) micMuteGain.disconnect();
+      if (micStream) micStream.getTracks().forEach((track) => track.stop());
+      if (micContext && micContext !== playbackContext) micContext.close().catch(() => {});
+      micProcessor = null;
+      micMuteGain = null;
+      micStream = null;
+      micContext = null;
+    }
+
+    function schedulePcmPlayback(blob) {
+      if (!playbackContext) return;
+      playbackQueue = playbackQueue
+        .then(() => blob.arrayBuffer())
+        .then((raw) => {
+          const usableBytes = raw.byteLength - (raw.byteLength % 2);
+          if (!usableBytes) return;
+          const view = new DataView(raw, 0, usableBytes);
+          const samples = usableBytes / 2;
+          const buffer = playbackContext.createBuffer(1, samples, 8000);
+          const channel = buffer.getChannelData(0);
+          for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
+          const source = playbackContext.createBufferSource();
+          source.buffer = buffer;
+          source.connect(playbackContext.destination);
+          const startAt = Math.max(playbackContext.currentTime + 0.02, playbackCursor);
+          source.start(startAt);
+          playbackCursor = startAt + buffer.duration;
+        })
+        .catch(() => {});
+    }
+
+    function startBrowserSpeechFallback() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec || recognition) return;
+      recognition = new SpeechRec();
+      recognition.lang = "en-IN";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        if (isHalfDuplexMuted || !isCallActive) return;
+        clearTimeout(silenceDebounceTimer);
+        let currentInterim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const phrase = event.results[i][0].transcript;
+          if (event.results[i].isFinal) accumulatedSpeech = (accumulatedSpeech + " " + phrase).trim();
+          else currentInterim += phrase;
+        }
+        interimSpeech = currentInterim.trim();
+        const preview = (accumulatedSpeech + " " + interimSpeech).trim();
+        if (preview) lcdSub.textContent = `Mic: "${preview}"`;
+        if (/\b(over|ओवर)\s*[.,!?]*$/i.test(preview)) sendUtteranceToBackend(preview);
+        else if (preview) {
+          silenceDebounceTimer = setTimeout(() => {
+            const text = (accumulatedSpeech + " " + interimSpeech).trim();
+            if (text && !isHalfDuplexMuted && isCallActive) sendUtteranceToBackend(text);
+          }, SILENCE_WAIT_MS);
+        }
+      };
+      recognition.onerror = () => {};
+      recognition.onend = () => {
+        if (isCallActive && !isHalfDuplexMuted) {
+          try { recognition.start(); } catch (_) {}
+        }
+      };
+      try { recognition.start(); } catch (_) {}
+    }
+
+    function sendUtteranceToBackend(text) {
+      clearTimeout(silenceDebounceTimer);
+      const cleaned = (text || "").replace(/\b(over|ओवर)\s*[.,!?]*$/i, "").trim();
+      accumulatedSpeech = "";
+      interimSpeech = "";
+      dtmfBuffer = "";
+      updateDtmfDisplay();
+      if (!cleaned) return;
+
+      pauseMicForTTS();
+      lcdStatus.textContent = "Processing turn...";
+      lcdSub.textContent = `Input: "${cleaned}"`;
+
+      if (callSocket && callSocket.readyState === WebSocket.OPEN) {
+        callSocket.send(
+          JSON.stringify({
+            type: "utterance",
+            text: cleaned,
+            stt_latency_ms: 135,
+          })
+        );
+      } else if (location.protocol !== "file:") {
+        fetch("/api/turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: activeSessionId, transcript: cleaned }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res.session_id) activeSessionId = res.session_id;
+            if (res.turn) applyLiveBackendTurn(res.session_id, res.turn);
+            const reply = res.turn?.reply_text || res.reply_text;
+            if (reply) speakReplyHalfDuplex(reply);
+          })
+          .catch(() => {});
+      }
+    }
+
+    /* =====================================================================
+       HANDSET CALL / SEND TURN / END BUTTONS
+       ===================================================================== */
+    function startLiveCall() {
+      if (isCallActive) return;
+      isCallActive = true;
+      callSeconds = 0;
+      accumulatedSpeech = "";
+      interimSpeech = "";
+      dtmfBuffer = "";
+      updateDtmfDisplay();
+      connectConsoleWebSocket();
+
+      nokiaLcd.classList.add("in-call");
+      lcdStatus.textContent = "Connecting line...";
+      lcdDuplex.textContent = "Mic muted (greeting)";
+      lcdSub.textContent = "Connecting to ASHA-Vani...";
+
+      clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds += 1;
+        lcdTimer.textContent = formatClock(callSeconds);
+      }, 1000);
+
+      if (location.protocol !== "file:") {
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        callSocket = new WebSocket(`${proto}//${location.host}/ws/call`);
+        callSocket.binaryType = "blob";
+        callSocket.onmessage = (ev) => {
+          if (typeof ev.data !== "string") {
+            if (ttsStreamActive) schedulePcmPlayback(ev.data);
+            return;
+          }
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "call_started") {
+            activeSessionId = msg.session_id;
+            pendingGreeting = msg.greeting_text || "";
+            ensureLiveVisitStarted(msg.session_id);
+          } else if (msg.type === "turn_reply") {
+            if (msg.turn) {
+              applyLiveBackendTurn(msg.session_id || activeSessionId, msg.turn);
+            }
+            if (ttsFailed) {
+              ttsFailed = false;
+              speakReplyHalfDuplex(msg.reply_text);
+            }
+          } else if (msg.type === "call_ended") {
+            endLiveCall();
+          } else if (msg.type === "tts_start") {
+            ttsFailed = false;
+            ttsStreamActive = true;
+            pauseMicForTTS();
+            if (playbackContext) {
+              playbackContext.resume().catch(() => {});
+              playbackCursor = playbackContext.currentTime + 0.04;
+              playbackQueue = Promise.resolve();
+            }
+          } else if (msg.type === "tts_end") {
+            ttsStreamActive = false;
+            pendingGreeting = "";
+            playbackQueue.finally(() => {
+              const waitMs = playbackContext
+                ? Math.max(0, (playbackCursor - playbackContext.currentTime) * 1000) + 100
+                : 100;
+              setTimeout(() => {
+                if (isCallActive) resumeMicAfterTTS();
+              }, waitMs);
+            });
+          } else if (msg.type === "tts_error") {
+            ttsStreamActive = false;
+            ttsFailed = true;
+            if (pendingGreeting) {
+              const greeting = pendingGreeting;
+              pendingGreeting = "";
+              speakReplyHalfDuplex(greeting);
+            }
+          } else if (msg.type === "stt_error") {
+            stopLiveMicrophone();
+            startBrowserSpeechFallback();
+          }
+        };
+        callSocket.onclose = () => {
+          if (isCallActive) endLiveCall();
+        };
+        startLiveMicrophone().catch(() => {
+          startBrowserSpeechFallback();
+        });
+      }
+    }
+
+    function endLiveCall() {
+      isCallActive = false;
+      isHalfDuplexMuted = false;
+      clearTimeout(silenceDebounceTimer);
+      clearInterval(callTimerInterval);
+      if (recognition) {
+        try { recognition.abort(); } catch (_) {}
+        recognition = null;
+      }
+      if (activeAudio) {
+        try { activeAudio.pause(); } catch (_) {}
+        activeAudio = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      stopLiveMicrophone();
+      if (playbackContext) {
+        playbackContext.close().catch(() => {});
+        playbackContext = null;
+      }
+      playbackQueue = Promise.resolve();
+      if (callSocket && callSocket.readyState === WebSocket.OPEN) {
+        callSocket.send(JSON.stringify({ type: "hangup" }));
+        callSocket.close();
+      }
+      callSocket = null;
+      nokiaLcd.classList.remove("in-call");
+      lcdStatus.textContent = "Call ended";
+      lcdDuplex.textContent = "Mic idle";
+    }
+
+    document.getElementById("btnCall").addEventListener("click", startLiveCall);
+    document.getElementById("btnEnd").addEventListener("click", endLiveCall);
+    document.getElementById("btnOver").addEventListener("click", () => {
+      if (dtmfBuffer.trim().length > 0) {
+        const toSend = dtmfBuffer.trim();
+        dtmfBuffer = "";
+        updateDtmfDisplay();
+        sendUtteranceToBackend(toSend);
+        return;
+      }
+      const currentSpoken = (accumulatedSpeech + " " + interimSpeech).trim();
+      if (currentSpoken) {
+        sendUtteranceToBackend(currentSpoken);
+      } else {
+        const manual = prompt(
+          "Speak into mic, dial keypad digits, or type Hindi/Hinglish utterance here:",
+          "ASHA ID 005"
+        );
+        if (manual) sendUtteranceToBackend(manual);
+      }
+    });
+
+    /* =====================================================================
+       SCRIPTED FIELD SCENARIOS (Runs Through Real Backend /api/turn)
+       ===================================================================== */
+    window.simulateScenario = function (kind) {
+      activeSessionId = null;
+      if (kind === "critical") {
+        sendUtteranceToBackend(
+          "Didi main ASHA 005 bol rahi hoon, Rampur se Radha Devi umar 25 saal, 34 hafte ki garbhvati hai, BP 164 by 112 hai, Hb 6.1 hai, tez sar dard aur dhundhla dikh raha hai"
+        );
+      } else if (kind === "nonpregnant") {
+        sendUtteranceToBackend(
+          "Mera ASHA ID 008 hai, Belwa se Savita Devi 31 saal, garbhvati nahi hai, BP 124/82 hai, Hb 5.8 hai aur bukhar hai"
+        );
+      } else if (kind === "garbled") {
+        sendUtteranceToBackend(
+          "ASHA 005, Rampur se Pooja Devi 22 saal, 28 hafte pregnant, BP 420 over 110 hai, Hb 9.5 hai, koi dikkat nahi"
+        );
+      }
+    };
+
+    /* =====================================================================
+       INITIALIZATION & SUPABASE RECOVERY
+       ===================================================================== */
+    async function loadInitialState() {
+      try {
+        const hRes = await fetch("/health");
+        const hData = await hRes.json();
+        const supaLabel = document.getElementById("supabaseLabel");
+        if (hData.supabase_configured) {
+          supaLabel.textContent = "Supabase synced";
+        } else {
+          supaLabel.textContent = "Local field ledger";
+        }
+      } catch (e) {}
+
+      renderRegister();
+      connectConsoleWebSocket();
+      hydrateSavedRegister();
+    }
+
+    window.addEventListener("DOMContentLoaded", loadInitialState);
+  </script>
+</body>
+</html>

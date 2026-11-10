@@ -3,48 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASHA-Vani · PHC Register & Nokia Simulator Sketch</title>
+  <title>ASHA-Vani — Clinical Voice Intake & Early Warning</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    /* =====================================================================
-       Design System: Cal.com + Vercel Light (Left 75%) & Linear Dark (Right 25%)
-       ===================================================================== */
     :root {
-      --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
-      --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-
-      /* Light PHC Console tokens (Vercel / Cal.com) */
-      --bg-canvas: #fafafa;
+      --bg-canvas: #f8f9fa;
       --bg-surface: #ffffff;
       --bg-subtle: #f4f4f5;
-      --text-primary: #171717;
+      --text-primary: #09090b;
       --text-secondary: #52525b;
       --text-muted: #71717a;
-      --border-ring: rgba(0, 0, 0, 0.08);
-      --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.08), 0px 2px 4px rgba(0, 0, 0, 0.03);
-      --shadow-drawer: -8px 0px 30px rgba(0, 0, 0, 0.08), -1px 0px 0px rgba(0, 0, 0, 0.08);
+      --border-ring: #e4e4e7;
+      --border-strong: #d4d4d8;
 
-      /* Semantic Triage Tokens */
       --crit-bg: #fef2f2;
-      --crit-text: #dc2626;
-      --crit-ring: rgba(220, 38, 38, 0.22);
+      --crit-text: #b91c1c;
+      --crit-ring: rgba(185, 28, 28, 0.24);
 
       --urg-bg: #fffbeb;
-      --urg-text: #d97706;
-      --urg-ring: rgba(217, 119, 6, 0.24);
+      --urg-text: #b45309;
+      --urg-ring: rgba(180, 83, 9, 0.24);
 
       --rout-bg: #f0fdf4;
       --rout-text: #15803d;
-      --rout-ring: rgba(21, 128, 61, 0.2);
+      --rout-ring: rgba(21, 128, 61, 0.22);
 
-      /* Dark Dock Tokens (Linear style) */
-      --dock-bg: #0f1115;
-      --dock-surface: #161920;
-      --dock-border: rgba(255, 255, 255, 0.08);
-      --dock-text: #f3f4f6;
+      --dock-bg: #0c0d10;
+      --dock-surface: #14161b;
+      --dock-border: #232730;
+      --dock-text: #f4f4f5;
       --dock-muted: #9ca3af;
+
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
     }
 
     * {
@@ -60,64 +53,197 @@
       height: 100vh;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
-      font-feature-settings: "liga" 1, "calt" 1;
+    }
+
+    svg.icon {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 1.65;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
     }
 
     /* =====================================================================
-       Split Workspace Layout (75% Left Dashboard / Draggable / 25% Right Nokia)
+       Medical Officer Login Gate Overlay
+       ===================================================================== */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 9, 11, 0.72);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-overlay.hidden {
+      display: none;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-ring);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.28);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .login-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .login-sub {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .field-input {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      padding: 9px 11px;
+      border-radius: 7px;
+      border: 1px solid var(--border-ring);
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      outline: none;
+    }
+    .field-input:focus {
+      border-color: var(--text-primary);
+      background: var(--bg-surface);
+    }
+    .btn-primary {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--text-primary);
+      background: var(--text-primary);
+      color: #ffffff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.12s ease;
+    }
+    .btn-primary:hover {
+      background: #27272a;
+    }
+    .btn-secondary {
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 9px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--border-ring);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-secondary:hover {
+      background: #e4e4e7;
+    }
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border-ring);
+    }
+
+    /* =====================================================================
+       75 / 25 Split Workspace
        ===================================================================== */
     .workspace {
       display: flex;
       width: 100vw;
       height: 100vh;
-      position: relative;
     }
 
     .phc-pane {
       width: 74%;
-      min-width: 520px;
-      height: 100%;
+      min-width: 56%;
+      max-width: 82%;
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      position: relative;
       background: var(--bg-canvas);
+      position: relative;
       overflow: hidden;
     }
 
     .splitter {
       width: 5px;
       cursor: col-resize;
-      background: #e4e4e7;
+      background: var(--border-ring);
       transition: background 0.15s ease;
-      position: relative;
       z-index: 30;
-      flex-shrink: 0;
     }
-    .splitter:hover, .splitter.dragging {
-      background: #171717;
+    .splitter:hover,
+    .splitter.dragging {
+      background: #71717a;
     }
 
     .phone-dock {
       flex: 1;
-      min-width: 320px;
-      height: 100%;
+      height: 100vh;
       background: var(--dock-bg);
       color: var(--dock-text);
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 16px 18px;
+      justify-content: space-between;
+      padding: 14px 16px;
       overflow-y: auto;
+      border-left: 1px solid #18181b;
+      gap: 12px;
     }
 
     /* =====================================================================
-       PHC Topbar
+       Top Bar — Minimal Geometric Logo + System Telemetry
        ===================================================================== */
     .topbar {
-      height: 56px;
-      background: var(--bg-surface);
-      box-shadow: 0 1px 0 var(--border-ring);
+      height: 54px;
       padding: 0 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-ring);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -127,105 +253,205 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 11px;
     }
-    .brand-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #171717;
+    .logo-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--text-primary);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .brand-title {
+      font-size: 14.5px;
       font-weight: 600;
-      font-size: 15px;
       letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+    .brand-sep {
+      color: var(--border-strong);
+      font-weight: 300;
     }
     .brand-sub {
       font-size: 12px;
-      color: var(--text-muted);
-      padding-left: 10px;
-      border-left: 1px solid #e4e4e7;
+      color: var(--text-secondary);
+      font-weight: 400;
     }
 
-    .sim-pill {
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .telemetry-pill {
       font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 500;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      background: #f4f4f5;
+      padding: 4px 9px;
+      border-radius: 6px;
+      background: var(--bg-subtle);
       color: var(--text-secondary);
-      box-shadow: 0 0 0 1px var(--border-ring);
+      border: 1px solid var(--border-ring);
       display: inline-flex;
       align-items: center;
       gap: 6px;
     }
-    .sim-pill .live-dot {
+    .status-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #16a34a;
+      background: #15803d;
+    }
+    .status-dot.amber {
+      background: #b45309;
+    }
+
+    .officer-chip {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-ring);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .officer-chip:hover {
+      background: var(--bg-subtle);
     }
 
     /* =====================================================================
-       Stats & Filters Bar
+       Summary Strip, Live 7-Step Call Progress Bar & Filters
        ===================================================================== */
     .controls-section {
-      padding: 20px 24px 14px;
+      padding: 16px 24px 12px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       flex-shrink: 0;
     }
 
     .summary-strip {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
     }
+
     .stat-card {
       background: var(--bg-surface);
-      box-shadow: var(--shadow-card);
+      border: 1px solid var(--border-ring);
       border-radius: 8px;
-      padding: 12px 14px;
+      padding: 11px 14px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
     .stat-label {
       font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--text-muted);
       font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     .stat-value {
       font-family: var(--font-mono);
       font-size: 20px;
       font-weight: 600;
       letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
     }
 
+    /* Live Call 7-Step Checklist Progress Bar */
+    .live-stepper-bar {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-ring);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stepper-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+    .stepper-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stepper-english {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .stepper-track {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .step-pill {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .step-pill.done {
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: rgba(21, 128, 61, 0.25);
+      font-weight: 500;
+    }
+    .step-pill.active {
+      background: var(--text-primary);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Filter Bar */
     .filter-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
-
     .filter-group {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
     }
 
     .pill-tabs {
       display: inline-flex;
-      background: #ededf0;
+      background: #ececee;
       padding: 3px;
-      border-radius: 8px;
+      border-radius: 7px;
       gap: 2px;
     }
     .pill-tab {
@@ -235,10 +461,9 @@
       font-size: 12px;
       font-weight: 500;
       color: var(--text-secondary);
-      padding: 5px 10px;
-      border-radius: 6px;
+      padding: 5px 11px;
+      border-radius: 5px;
       cursor: pointer;
-      transition: all 0.12s ease;
     }
     .pill-tab.active {
       background: var(--bg-surface);
@@ -246,38 +471,35 @@
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
-    .select-control, .search-input {
-      height: 32px;
-      background: var(--bg-surface);
-      border: none;
-      box-shadow: 0 0 0 1px var(--border-ring);
-      border-radius: 6px;
+    .select-control,
+    .search-input {
+      height: 31px;
       padding: 0 10px;
       font-family: var(--font-sans);
       font-size: 12px;
       color: var(--text-primary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-ring);
+      border-radius: 6px;
       outline: none;
     }
     .search-input {
       width: 210px;
     }
-    .select-control:focus, .search-input:focus {
-      box-shadow: 0 0 0 2px #171717;
-    }
 
     /* =====================================================================
-       Register Table
+       Full-Width Clinical Register Table (Never Blocked by Sidebar)
        ===================================================================== */
     .table-wrap {
       flex: 1;
-      padding: 0 24px 24px;
+      padding: 0 24px 20px;
       overflow-y: auto;
     }
 
     .table-card {
       background: var(--bg-surface);
-      box-shadow: var(--shadow-card);
-      border-radius: 10px;
+      border: 1px solid var(--border-ring);
+      border-radius: 9px;
       overflow: hidden;
     }
 
@@ -285,18 +507,18 @@
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 13px;
     }
 
     thead th {
-      background: #fafafa;
-      color: var(--text-muted);
-      font-weight: 500;
-      font-size: 11px;
+      font-size: 10.5px;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      padding: 10px 14px;
-      border-bottom: 1px solid #ececee;
+      color: var(--text-muted);
+      background: #fafafa;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-ring);
+      white-space: nowrap;
     }
 
     tbody tr {
@@ -308,21 +530,20 @@
       border-bottom: none;
     }
     tbody tr:hover {
-      background: #f8f8fa;
-    }
-    tbody tr.selected {
-      background: #f1f5f9;
+      background: #f8fafc;
     }
     tbody tr.flash-new {
-      animation: rowPulse 1.8s ease-out;
+      animation: rowHighlight 1.6s ease-out;
     }
-    @keyframes rowPulse {
+
+    @keyframes rowHighlight {
       0% { background: #fef9c3; }
       100% { background: transparent; }
     }
 
     td {
-      padding: 12px 14px;
+      padding: 11px 12px;
+      font-size: 12.5px;
       vertical-align: middle;
     }
 
@@ -336,29 +557,45 @@
       color: var(--text-primary);
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
+    }
+    .patient-name:hover {
+      text-decoration: underline;
     }
     .patient-sub {
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--text-muted);
     }
 
     .mono-val {
       font-family: var(--font-mono);
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 500;
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Badges */
+    .category-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-ring);
+      white-space: nowrap;
+    }
+
     .triage-badge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 9999px;
+      border-radius: 5px;
+      white-space: nowrap;
     }
     .triage-CRITICAL {
       background: var(--crit-bg);
@@ -378,106 +615,125 @@
 
     .verify-badge {
       font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 2px 7px;
+      font-size: 10.5px;
+      padding: 3px 7px;
       border-radius: 5px;
       font-weight: 500;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .verify-VERIFIED {
-      background: #f4f4f5;
-      color: #18181b;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      border: 1px solid var(--border-ring);
     }
     .verify-UNVERIFIED {
       background: #fffbeb;
       color: #b45309;
-      box-shadow: 0 0 0 1px rgba(180, 83, 9, 0.25);
+      border: 1px solid rgba(180, 83, 9, 0.25);
     }
 
-    /* 1-Click Action Pill */
-    .action-pill {
+    .dispatch-btn {
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 500;
-      padding: 5px 10px;
+      padding: 5px 9px;
       border-radius: 6px;
-      border: none;
+      border: 1px solid var(--text-primary);
+      background: var(--text-primary);
+      color: #ffffff;
       cursor: pointer;
-      transition: all 0.12s ease;
       display: inline-flex;
       align-items: center;
       gap: 5px;
+      white-space: nowrap;
     }
-    .action-pill.pending {
-      background: #171717;
-      color: #ffffff;
+    .dispatch-btn:hover {
+      background: #27272a;
     }
-    .action-pill.pending:hover {
-      background: #3f3f46;
-    }
-    .action-pill.done {
-      background: #f4f4f5;
-      color: #15803d;
-      box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.25);
+    .dispatch-btn.dispatched {
+      background: var(--rout-bg);
+      color: var(--rout-text);
+      border-color: var(--rout-ring);
     }
 
     /* =====================================================================
-       Slide-Over Patient & Step-by-Step Pipeline Inspector Drawer
+       Centered Patient & Pipeline Inspector Modal Popup (Replaces Sidebar)
        ===================================================================== */
-    .drawer {
-      position: absolute;
-      top: 56px;
-      right: 0;
-      bottom: 0;
-      width: 390px;
-      max-width: 92%;
-      background: var(--bg-surface);
-      box-shadow: var(--shadow-drawer);
-      z-index: 25;
-      transform: translateX(102%);
-      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 9, 11, 0.48);
+      backdrop-filter: blur(4px);
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
     }
-    .drawer.open {
-      transform: translateX(0);
+    .modal-backdrop.open {
+      display: flex;
     }
 
-    .drawer-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #ececee;
+    .modal-dialog {
+      width: 100%;
+      max-width: 820px;
+      max-height: 88vh;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-ring);
+      border-radius: 12px;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border-ring);
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
+      background: #fafafa;
     }
-    .drawer-title {
+    .modal-title {
       font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    .drawer-meta {
+    .modal-meta {
       font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 3px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      font-family: var(--font-mono);
     }
-    .close-btn {
-      background: #f4f4f5;
-      border: none;
-      width: 28px;
-      height: 28px;
+    .icon-close-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-ring);
+      width: 30px;
+      height: 30px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       color: var(--text-secondary);
     }
-    .close-btn:hover {
-      background: #e4e4e7;
+    .icon-close-btn:hover {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
     }
 
-    .drawer-body {
+    .modal-body {
       flex: 1;
       overflow-y: auto;
-      padding: 18px 20px 28px;
+      padding: 20px 22px 26px;
       display: flex;
       flex-direction: column;
       gap: 20px;
@@ -497,14 +753,14 @@
 
     .vitals-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
     }
     .vital-box {
       background: #fafafa;
-      box-shadow: 0 0 0 1px var(--border-ring);
+      border: 1px solid var(--border-ring);
       border-radius: 7px;
-      padding: 10px;
+      padding: 10px 12px;
     }
     .vital-label {
       font-size: 11px;
@@ -512,36 +768,74 @@
     }
     .vital-num {
       font-family: var(--font-mono);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       margin-top: 3px;
     }
 
-    .symptom-chips {
+    /* Dispatch Action Bar inside Modal */
+    .dispatch-bar {
+      background: #fafafa;
+      border: 1px solid var(--border-ring);
+      border-radius: 8px;
+      padding: 12px 14px;
       display: flex;
-      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       flex-wrap: wrap;
-      margin-top: 8px;
     }
-    .symptom-chip {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 5px;
-      background: #f4f4f5;
+    .dispatch-options {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .dispatch-opt-btn {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--border-ring);
+      background: var(--bg-surface);
       color: var(--text-primary);
-      box-shadow: 0 0 0 1px var(--border-ring);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dispatch-opt-btn:hover {
+      border-color: var(--text-primary);
+    }
+    .dispatch-opt-btn.primary-crit {
+      background: var(--text-primary);
+      color: #ffffff;
+      border-color: var(--text-primary);
     }
 
-    /* Pipeline Turn Logs */
+    /* Referral Slip Box */
+    .referral-slip {
+      background: #fafafa;
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
     .turn-card {
       background: #fafafa;
-      box-shadow: 0 0 0 1px var(--border-ring);
+      border: 1px solid var(--border-ring);
       border-radius: 8px;
-      padding: 12px;
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 9px;
     }
     .turn-head {
       display: flex;
@@ -552,12 +846,11 @@
       font-weight: 600;
       color: var(--text-secondary);
       padding-bottom: 6px;
-      border-bottom: 1px dashed #e4e4e7;
+      border-bottom: 1px solid var(--border-ring);
     }
-
     .step-row {
       display: grid;
-      grid-template-columns: 110px 1fr;
+      grid-template-columns: 125px 1fr;
       gap: 8px;
       font-size: 12px;
       align-items: baseline;
@@ -575,25 +868,24 @@
     .code-inline {
       font-family: var(--font-mono);
       font-size: 11px;
-      background: #ffffff;
-      padding: 4px 7px;
+      background: var(--bg-surface);
+      padding: 6px 8px;
       border-radius: 5px;
-      box-shadow: 0 0 0 1px var(--border-ring);
+      border: 1px solid var(--border-ring);
       display: block;
       white-space: pre-wrap;
     }
 
     /* =====================================================================
-       Right 25%: Classic Nokia Feature Phone Simulator + Demo Controls
+       Right 25%: Realistic Physical Nokia Feature-Phone Hardware
        ===================================================================== */
     .dock-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
     }
     .dock-title {
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -604,11 +896,10 @@
       font-size: 10.5px;
       padding: 2px 7px;
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      color: #e5e7eb;
+      background: rgba(255, 255, 255, 0.07);
+      color: #d4d4d8;
     }
 
-    /* Nokia Body — stretches to fill the dock cleanly */
     .nokia-section {
       flex: 1;
       display: flex;
@@ -621,184 +912,261 @@
       justify-content: center;
       min-height: 0;
     }
-    .nokia-body {
+
+    /* Sculpted Hardware Chassis */
+    .nokia-chassis {
       width: 100%;
-      max-width: 380px;
+      max-width: 340px;
       height: 100%;
-      background: linear-gradient(180deg, #272b35 0%, #1b1e26 100%);
-      border-radius: 30px;
-      padding: 18px 18px 20px;
+      background: radial-gradient(120% 90% at 50% 8%, #2d323e 0%, #181b22 65%, #111318 100%);
+      border-radius: 38px 38px 46px 46px;
+      padding: 14px 16px 16px;
       box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.18),
-        0 12px 28px rgba(0, 0, 0, 0.45),
-        0 0 0 1px rgba(255, 255, 255, 0.07);
+        inset 0 1.5px 2px rgba(255, 255, 255, 0.22),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.7),
+        0 18px 36px rgba(0, 0, 0, 0.65),
+        0 0 0 1.5px #2e3340;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      position: relative;
     }
 
-    .earpiece {
-      width: 54px;
-      height: 5px;
-      background: #0f1115;
-      border-radius: 999px;
-      margin: 0 auto;
-      box-shadow: inset 0 1px 1px rgba(0,0,0,0.8);
-      flex-shrink: 0;
-    }
-
-    .nokia-brand {
-      text-align: center;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 0.24em;
-      color: #9ca3af;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-
-    /* Monochrome / Backlit LCD Screen — expands to fill available height */
-    .nokia-lcd {
-      background: #9ead86;
-      color: #141c0e;
-      border-radius: 10px;
-      padding: 12px 14px;
+    /* Recessed Dark Screen Lens Bezel */
+    .nokia-lens {
+      background: linear-gradient(180deg, #0d0f13 0%, #151820 100%);
+      border-radius: 22px 22px 16px 16px;
+      padding: 10px 12px 10px;
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.8),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
       flex: 1;
-      min-height: 190px;
+      min-height: 0;
+    }
+
+    .earpiece-slot {
+      width: 48px;
+      height: 4px;
+      background: #07080a;
+      border-radius: 999px;
+      margin: 2px auto 0;
+      box-shadow: inset 0 1px 2px #000, 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .nokia-wordmark {
+      text-align: center;
+      font-family: var(--font-sans);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.28em;
+      color: #a1a1aa;
+    }
+
+    /* Backlit Monochrome Matrix LCD */
+    .nokia-lcd {
+      background: #96a87e;
+      color: #11180c;
+      border-radius: 8px;
+      padding: 10px 12px;
+      flex: 1;
+      min-height: 150px;
       font-family: var(--font-mono);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       box-shadow:
-        inset 0 2px 6px rgba(0, 0, 0, 0.28),
-        0 0 0 2px #111318;
+        inset 0 2px 6px rgba(0, 0, 0, 0.32),
+        0 0 0 1.5px #090a0d;
       transition: background 0.2s ease;
       overflow: hidden;
     }
     .nokia-lcd.active-call {
-      background: #b7cc99;
+      background: #b8ce99;
     }
 
     .lcd-top {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
+      align-items: center;
+      font-size: 10.5px;
       font-weight: 600;
-      border-bottom: 1px solid rgba(20, 28, 14, 0.25);
-      padding-bottom: 6px;
-      flex-shrink: 0;
+      border-bottom: 1px solid rgba(17, 24, 12, 0.22);
+      padding-bottom: 5px;
+    }
+    .lcd-icons {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .lcd-main {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 8px;
-      margin: 8px 0;
+      gap: 6px;
+      margin: 6px 0;
       overflow-y: auto;
     }
     .lcd-status {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: -0.01em;
     }
     .lcd-sub {
-      font-size: 12.5px;
-      line-height: 1.45;
-      opacity: 0.92;
+      font-size: 11.5px;
+      line-height: 1.42;
       word-break: break-word;
+    }
+    .lcd-dtmf {
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(17, 24, 12, 0.1);
+      padding: 3px 6px;
+      border-radius: 4px;
+      display: none;
+    }
+    .lcd-dtmf.visible {
+      display: block;
     }
     .lcd-bottom {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
-      border-top: 1px solid rgba(20, 28, 14, 0.2);
-      padding-top: 6px;
-      flex-shrink: 0;
+      border-top: 1px solid rgba(17, 24, 12, 0.18);
+      padding-top: 5px;
     }
 
-    /* Call / Nav Keys */
-    .nokia-nav-row {
+    /* Realistic Nokia 3-Cluster Navigation Deck (Call / D-Pad Ring / End) */
+    .nokia-nav-deck {
       display: grid;
-      grid-template-columns: 1fr 1.35fr 1fr;
+      grid-template-columns: 1fr 1.25fr 1fr;
       gap: 8px;
       align-items: center;
+      padding: 2px 0;
       flex-shrink: 0;
     }
 
-    .nokia-btn {
-      border: none;
-      border-radius: 10px;
-      padding: 11px 8px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
+    .hw-call-key {
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid #323846;
+      background: linear-gradient(180deg, #282d38 0%, #1c2028 100%);
+      color: #f4f4f5;
       cursor: pointer;
-      color: #fff;
-      background: #2f3542;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 0 #0f1115;
-      transition: transform 0.08s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0b0c10;
     }
-    .nokia-btn:active {
+    .hw-call-key:active {
       transform: translateY(1px);
     }
-    .nokia-btn.call-green {
-      background: #15803d;
+    .key-bar-green {
+      width: 22px;
+      height: 3px;
+      border-radius: 99px;
+      background: #22c55e;
     }
-    .nokia-btn.call-red {
-      background: #b91c1c;
-    }
-    .nokia-btn.over-btn {
-      background: #374151;
-      color: #fde047;
+    .key-bar-red {
+      width: 22px;
+      height: 3px;
+      border-radius: 99px;
+      background: #ef4444;
     }
 
+    /* Center Chrome D-Pad Squircle */
+    .hw-dpad {
+      height: 48px;
+      border-radius: 15px;
+      padding: 4px;
+      background: linear-gradient(180deg, #71717a 0%, #3f3f46 100%);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hw-dpad:active {
+      transform: translateY(1px);
+    }
+    .hw-dpad-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 11px;
+      background: linear-gradient(180deg, #27272a 0%, #18181b 100%);
+      color: #e4e4e7;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    /* Physical Sculpted Keypad */
     .nokia-keypad {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
+      gap: 6px;
       flex-shrink: 0;
     }
     .key-num {
-      background: #262a34;
-      border: none;
-      border-radius: 8px;
-      height: 34px;
-      color: #e5e7eb;
+      background: linear-gradient(180deg, #262b36 0%, #1b1f27 100%);
+      border: 1px solid #2e3440;
+      border-radius: 10px;
+      height: 33px;
+      color: #f4f4f5;
       font-family: var(--font-mono);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 0 #101217;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 #0c0e12;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      padding-top: 6px;
+    }
+    .key-num:active {
+      transform: translateY(1px);
+      background: #323846;
     }
     .key-num span {
-      font-size: 8px;
+      font-size: 8.5px;
       color: #9ca3af;
-      margin-left: 2px;
+      margin-left: 3px;
       font-weight: 400;
+      text-transform: uppercase;
     }
 
-    /* Demo Controls Box underneath Nokia */
+    /* Demo Controls Strip */
     .demo-box {
       background: var(--dock-surface);
       border: 1px solid var(--dock-border);
       border-radius: 10px;
-      padding: 12px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
     .demo-label {
       font-family: var(--font-mono);
-      font-size: 10.5px;
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--dock-muted);
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
-
     .noise-Group {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -809,44 +1177,42 @@
       border: 1px solid var(--dock-border);
       color: var(--dock-muted);
       font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 5px 4px;
-      border-radius: 6px;
+      font-size: 10.5px;
+      padding: 4px;
+      border-radius: 5px;
       cursor: pointer;
     }
     .noise-btn.active {
-      background: #f3f4f6;
-      color: #111318;
+      background: #f4f4f5;
+      color: #09090b;
       font-weight: 600;
     }
-
     .scenario-list {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
     .scenario-btn {
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--dock-border);
       color: var(--dock-text);
       text-align: left;
-      padding: 7px 10px;
-      border-radius: 7px;
+      padding: 6px 9px;
+      border-radius: 6px;
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 11.5px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      transition: background 0.12s ease;
     }
     .scenario-btn:hover {
-      background: rgba(255, 255, 255, 0.09);
+      background: rgba(255, 255, 255, 0.08);
     }
     .scenario-tag {
       font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 2px 6px;
+      font-size: 9.5px;
+      padding: 2px 5px;
       border-radius: 4px;
       background: rgba(255, 255, 255, 0.08);
     }
@@ -854,167 +1220,299 @@
 </head>
 <body>
 
+  <!-- ===================================================================
+       MEDICAL OFFICER LOGIN OVERLAY (Supabase Auth + 1-Click Demo Officer)
+       =================================================================== -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div>
+        <div class="login-brand">
+          <span class="logo-mark">
+            <svg class="icon" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
+              <path d="M6 9v6M10 5v14M14 8v8M18 11v2" />
+            </svg>
+          </span>
+          <span class="login-title">ASHA-Vani Clinical Console</span>
+        </div>
+        <p class="login-sub">Sign in with your Medical Officer credentials to view real-time voice intakes and authorize home dispatch units.</p>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="loginEmail">Officer Email</label>
+        <input class="field-input" id="loginEmail" type="email" value="dr.verma@asha-vani.in" />
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="loginPassword">Password (Supabase Auth)</label>
+        <input class="field-input" id="loginPassword" type="password" placeholder="Enter password or use Demo Login below" />
+      </div>
+
+      <button class="btn-primary" id="btnSignIn">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Sign In to Triage Console</span>
+      </button>
+
+      <div class="login-divider">Instant Evaluation Access</div>
+
+      <button class="btn-secondary" id="btnDemoLogin">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span>Continue as Demo Medical Officer (Dr. A. Verma)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MAIN 75 / 25 WORKSPACE
+       =================================================================== -->
   <div class="workspace">
-    <!-- =================================================================
-         LEFT 75%: PHC CLINIC DATABASE DASHBOARD
-         ================================================================= -->
+    <!-- LEFT 75%: CLINICAL REGISTER & DISPATCH CONSOLE -->
     <section class="phc-pane" id="phcPane">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-dot"></span>
-          <span class="brand-title">ASHA-Vani · PHC Rampur Register</span>
-          <span class="brand-sub">Decision Support & Early Warning (Not a diagnosis)</span>
+          <span class="logo-mark" title="ASHA-Vani">
+            <svg class="icon" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
+              <path d="M6 9v6M10 5v14M14 8v8M18 11v2" />
+            </svg>
+          </span>
+          <span class="brand-title">ASHA-Vani</span>
+          <span class="brand-sep">/</span>
+          <span class="brand-sub">Voice Intake & Clinical Triage</span>
         </div>
-        <div class="sim-pill">
-          <span class="live-dot"></span>
-          SIMULATED TELEPHONY & ALERTS
+
+        <div class="topbar-right">
+          <div class="telemetry-pill" title="Gnani Prisma STT + Timbre v2.5 TTS">
+            <span class="status-dot"></span>
+            <span>Gnani Timbre v2.5</span>
+          </div>
+          <div class="telemetry-pill" title="Groq Llama 3.3 70B Structured Extraction">
+            <span class="status-dot"></span>
+            <span>Groq 70B + Rule Engine</span>
+          </div>
+          <div class="telemetry-pill" id="supabasePill" title="Database Persistence Status">
+            <span class="status-dot amber" id="supabaseDot"></span>
+            <span id="supabaseLabel">Local + Sync Ready</span>
+          </div>
+          <button class="officer-chip" id="officerChip" title="Click to sign out / switch officer">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+            <span id="officerNameLabel">Dr. A. Verma</span>
+          </button>
         </div>
       </header>
 
       <div class="controls-section">
+        <!-- 5-Metric Operational Strip -->
         <div class="summary-strip">
           <div class="stat-card">
-            <span class="stat-label">Total Visits Today</span>
+            <span class="stat-label">
+              <span>Total Intakes Today</span>
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            </span>
             <span class="stat-value" id="statTotal">4</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Critical (Rule R1/R2/R4)</span>
+            <span class="stat-label">
+              <span>Critical (R1 / R2 / R4)</span>
+              <svg class="icon" viewBox="0 0 24 24" style="color: var(--crit-text);"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+            </span>
             <span class="stat-value" style="color: var(--crit-text);" id="statCrit">1</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Urgent (Rule R3/R5a/R8)</span>
+            <span class="stat-label">
+              <span>Urgent (R3 / R5a / R8)</span>
+              <svg class="icon" viewBox="0 0 24 24" style="color: var(--urg-text);"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg>
+            </span>
             <span class="stat-value" style="color: var(--urg-text);" id="statUrg">1</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Pending Referral Action</span>
-            <span class="stat-value" id="statPending">2</span>
+            <span class="stat-label">
+              <span>Active ASHA Workers</span>
+              <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <span class="stat-value" id="statWorkers">3</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">
+              <span>Dispatched to Home</span>
+              <svg class="icon" viewBox="0 0 24 24" style="color: var(--rout-text);"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </span>
+            <span class="stat-value" id="statDispatched">1</span>
           </div>
         </div>
 
+        <!-- 7-Step Live Call Checklist Progress Bar -->
+        <div class="live-stepper-bar">
+          <div class="stepper-top">
+            <span class="stepper-title">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></svg>
+              <span id="stepperStatusText">Live Intake Checklist · Ready</span>
+            </span>
+            <span class="stepper-english" id="stepperEnglishSub">Press green Call key on Nokia handset or use keypad DTMF</span>
+          </div>
+          <div class="stepper-track" id="stepperTrack">
+            <div class="step-pill" data-step="ASK_ASHA_ID"><span>01 ASHA ID</span></div>
+            <div class="step-pill" data-step="ASK_PATIENT_NAME"><span>02 Patient</span></div>
+            <div class="step-pill" data-step="ASK_SPOUSE_NAME"><span>03 Spouse</span></div>
+            <div class="step-pill" data-step="ASK_WEEKS"><span>04 Category/Wks</span></div>
+            <div class="step-pill" data-step="ASK_BP"><span>05 Blood Pressure</span></div>
+            <div class="step-pill" data-step="ASK_HB"><span>06 Hb & Signs</span></div>
+            <div class="step-pill" data-step="CONFIRM_VALUES"><span>07 Readback</span></div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
         <div class="filter-bar">
           <div class="filter-group">
             <div class="pill-tabs" id="triageTabs">
-              <button class="pill-tab active" data-triage="ALL">All</button>
+              <button class="pill-tab active" data-triage="ALL">All Visits</button>
               <button class="pill-tab" data-triage="CRITICAL">Critical</button>
               <button class="pill-tab" data-triage="URGENT">Urgent</button>
               <button class="pill-tab" data-triage="ROUTINE">Routine</button>
             </div>
 
             <select class="select-control" id="villageFilter">
-              <option value="ALL">All Villages (PHC Rampur)</option>
-              <option value="Rampur">Village: Rampur</option>
-              <option value="Belwa">Village: Belwa</option>
+              <option value="ALL">All Sectors / Villages</option>
+              <option value="Rampur">Sector: Rampur</option>
+              <option value="Belwa">Sector: Belwa</option>
+              <option value="Pipra">Sector: Pipra</option>
             </select>
 
             <select class="select-control" id="verifyFilter">
-              <option value="ALL">Status: All</option>
+              <option value="ALL">Readback: All</option>
               <option value="UNVERIFIED">Unverified (In Call)</option>
               <option value="VERIFIED">Verified</option>
-              <option value="INCOMPLETE">Incomplete</option>
             </select>
           </div>
 
-          <input type="text" class="search-input" id="searchInput" placeholder="Search patient or ASHA..." />
+          <input type="text" class="search-input" id="searchInput" placeholder="Search patient, ASHA ID, village..." />
         </div>
       </div>
 
+      <!-- Full-Width Register Table -->
       <div class="table-wrap">
         <div class="table-card">
           <table>
             <thead>
               <tr>
-                <th>Date & Time</th>
-                <th>Patient & Husband</th>
-                <th>Village / Tola</th>
+                <th>Recorded At</th>
+                <th>Patient & Guardian</th>
+                <th>Category</th>
+                <th>Location</th>
                 <th>ASHA Worker</th>
                 <th>Weeks</th>
                 <th>BP (mmHg)</th>
                 <th>Hb (g/dL)</th>
                 <th>Triage & Rule</th>
                 <th>Readback</th>
-                <th>Action (SIM)</th>
+                <th>Home Dispatch</th>
               </tr>
             </thead>
             <tbody id="registerBody"></tbody>
           </table>
         </div>
       </div>
-
-      <!-- SLIDE-OVER PATIENT & TURN PIPELINE INSPECTOR DRAWER -->
-      <aside class="drawer" id="patientDrawer">
-        <div class="drawer-header">
-          <div>
-            <div class="drawer-title" id="drawerName">Pooja Devi</div>
-            <div class="drawer-meta" id="drawerMeta">W/o Ramesh Kumar · Rampur (Purani Basti) · Age 24</div>
-          </div>
-          <button class="close-btn" id="closeDrawerBtn" title="Close">✕</button>
-        </div>
-        <div class="drawer-body" id="drawerBody"></div>
-      </aside>
     </section>
 
     <!-- Draggable Split Divider -->
     <div class="splitter" id="splitter" title="Drag to resize"></div>
 
     <!-- =================================================================
-         RIGHT 25%: VILLAGE NOKIA FEATURE-PHONE SIMULATOR
+         RIGHT 25%: REALISTIC NOKIA FEATURE PHONE + DTMF KEYPAD
          ================================================================= -->
     <aside class="phone-dock">
       <div class="nokia-section">
         <div class="dock-header">
-          <span class="dock-title">ASHA Caller Simulator</span>
-          <span class="dock-badge">8kHz PCM16 · μ-law · SIM</span>
+          <span class="dock-title">ASHA Handset</span>
+          <span class="dock-badge">8kHz PCM · DTMF · SIM</span>
         </div>
 
         <div class="nokia-wrap">
-          <div class="nokia-body">
-            <div class="earpiece"></div>
-            <div class="nokia-brand">NOKIA · ASHA-SIM</div>
+          <div class="nokia-chassis">
+            <div class="nokia-lens">
+              <div class="earpiece-slot"></div>
+              <div class="nokia-wordmark">NOKIA</div>
 
-            <div class="nokia-lcd" id="nokiaLcd">
-              <div class="lcd-top">
-                <span>BSNL-SIM</span>
-                <span id="lcdTimer">00:00</span>
-              </div>
-              <div class="lcd-main">
-                <div class="lcd-status" id="lcdStatus">Ready to Dial</div>
-                <div class="lcd-sub" id="lcdSub">PHC Toll-Free: 1800-ASHA<br/>Caller: Sunita (ASHA-001)</div>
-              </div>
-              <div class="lcd-bottom">
-                <span id="lcdDuplex">MIC IDLE</span>
-                <span id="lcdNoiseTag">CLEAN</span>
+              <div class="nokia-lcd" id="nokiaLcd">
+                <div class="lcd-top">
+                  <span class="lcd-icons">
+                    <!-- Minimal Signal Bars SVG -->
+                    <svg class="icon" viewBox="0 0 16 14" style="width: 12px; height: 11px; stroke-width: 1.8;">
+                      <path d="M1 12v-2M5 12V8M9 12V5M13 12V2"/>
+                    </svg>
+                    <span>BSNL-2G</span>
+                  </span>
+                  <span id="lcdTimer">00:00</span>
+                  <span class="lcd-icons">
+                    <!-- Minimal Battery SVG -->
+                    <svg class="icon" viewBox="0 0 20 12" style="width: 14px; height: 10px;">
+                      <rect x="1" y="2" width="15" height="8" rx="1"/>
+                      <path d="M18 4v4M4 5v2M8 5v2M12 5v2"/>
+                    </svg>
+                  </span>
+                </div>
+
+                <div class="lcd-main">
+                  <div class="lcd-status" id="lcdStatus">Ready to Dial</div>
+                  <div class="lcd-sub" id="lcdSub">Toll-Free: 1800-ASHA<br/>Press Call or dial keypad</div>
+                  <div class="lcd-dtmf" id="lcdDtmf">Keypad: </div>
+                </div>
+
+                <div class="lcd-bottom">
+                  <span id="lcdDuplex">MIC IDLE</span>
+                  <span id="lcdNoiseTag">CLEAN</span>
+                </div>
               </div>
             </div>
 
-            <div class="nokia-nav-row">
-              <button class="nokia-btn call-green" id="btnCall">CALL</button>
-              <button class="nokia-btn over-btn" id="btnOver" title="Finish speaking turn immediately">OVER ↵</button>
-              <button class="nokia-btn call-red" id="btnEnd">END</button>
+            <!-- Realistic 3-Cluster Navigation Deck -->
+            <div class="nokia-nav-deck">
+              <button class="hw-call-key" id="btnCall" title="Start Voice Call">
+                <span class="key-bar-green"></span>
+                <svg class="icon" viewBox="0 0 24 24">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </button>
+
+              <button class="hw-dpad" id="btnOver" title="Send spoken utterance or keypad digits">
+                <div class="hw-dpad-inner">
+                  <span>SEND</span>
+                  <svg class="icon" viewBox="0 0 24 24" style="width: 12px; height: 12px;">
+                    <path d="M5 12h14M13 6l6 6-6 6"/>
+                  </svg>
+                </div>
+              </button>
+
+              <button class="hw-call-key" id="btnEnd" title="End Call">
+                <span class="key-bar-red"></span>
+                <svg class="icon" viewBox="0 0 24 24">
+                  <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91M2 2l20 20"/>
+                </svg>
+              </button>
             </div>
 
-            <div class="nokia-keypad">
-              <button class="key-num">1<span>oo</span></button>
-              <button class="key-num">2<span>abc</span></button>
-              <button class="key-num">3<span>def</span></button>
-              <button class="key-num">4<span>ghi</span></button>
-              <button class="key-num">5<span>jkl</span></button>
-              <button class="key-num">6<span>mno</span></button>
-              <button class="key-num">7<span>pqrs</span></button>
-              <button class="key-num">8<span>tuv</span></button>
-              <button class="key-num">9<span>wxyz</span></button>
-              <button class="key-num">*</button>
-              <button class="key-num">0<span>+</span></button>
-              <button class="key-num">#</button>
+            <!-- Working DTMF Keypad (Type ASHA ID 005, BP 150*95, or 1 to Confirm) -->
+            <div class="nokia-keypad" id="dtmfKeypad">
+              <button class="key-num" data-key="1">1<span>yes</span></button>
+              <button class="key-num" data-key="2">2<span>abc</span></button>
+              <button class="key-num" data-key="3">3<span>def</span></button>
+              <button class="key-num" data-key="4">4<span>ghi</span></button>
+              <button class="key-num" data-key="5">5<span>jkl</span></button>
+              <button class="key-num" data-key="6">6<span>mno</span></button>
+              <button class="key-num" data-key="7">7<span>pqrs</span></button>
+              <button class="key-num" data-key="8">8<span>tuv</span></button>
+              <button class="key-num" data-key="9">9<span>wxyz</span></button>
+              <button class="key-num" data-key="*">*<span>/ .</span></button>
+              <button class="key-num" data-key="0">0<span>non-p</span></button>
+              <button class="key-num" data-key="#">#<span>send</span></button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Compact Demo Controls Strip underneath Nokia -->
+      <!-- Acoustic & Synthetic Scenario Controls -->
       <div class="demo-box">
         <div class="demo-label">
-          <span>Village Background Noise</span>
-          <span id="snrLabel">Off</span>
+          <span>Village Acoustic Channel</span>
+          <span id="snrLabel">Clean</span>
         </div>
         <div class="noise-Group" id="noiseGroup">
           <button class="noise-btn active" data-noise="CLEAN">Clean</button>
@@ -1022,29 +1520,60 @@
           <button class="noise-btn" data-noise="5dB">5 dB SNR</button>
         </div>
 
-        <div class="demo-label" style="margin-top: 4px;">
-          <span>1-Click Demo Call Scenarios</span>
+        <div class="demo-label" style="margin-top: 2px;">
+          <span>1-Click Replay Scenarios</span>
           <span>Synthetic</span>
         </div>
         <div class="scenario-list">
           <button class="scenario-btn" onclick="simulateScenario('critical')">
-            <span>1. Critical BP + Headache (R2)</span>
+            <span>1. Critical BP 165/112 + Headache (R1/R2)</span>
             <span class="scenario-tag">2 Turns</span>
           </button>
-          <button class="scenario-btn" onclick="simulateScenario('anemia')">
-            <span>2. Severe Anemia Hb 6.4 (R5a)</span>
-            <span class="scenario-tag">2 Turns</span>
+          <button class="scenario-btn" onclick="simulateScenario('nonpregnant')">
+            <span>2. Non-Pregnant Severe Anemia Hb 6.2 (R5a)</span>
+            <span class="scenario-tag">General</span>
           </button>
           <button class="scenario-btn" onclick="simulateScenario('garbled')">
-            <span>3. Garbled BP 310/95 → Safe Repeat</span>
-            <span class="scenario-tag">Refusal</span>
+            <span>3. Garbled BP 310/95 → Hard Refusal</span>
+            <span class="scenario-tag">Safety</span>
           </button>
         </div>
       </div>
     </aside>
   </div>
 
+  <!-- ===================================================================
+       CENTERED PATIENT, PIPELINE & HOME DISPATCH MODAL POPUP
+       =================================================================== -->
+  <div class="modal-backdrop" id="patientModalBackdrop">
+    <div class="modal-dialog" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">
+            <span id="modalPatientName">Pooja Devi</span>
+            <span class="category-chip" id="modalCategoryChip">Maternal ANC</span>
+          </div>
+          <div class="modal-meta" id="modalPatientMeta">W/o Ramesh Kumar · Rampur · ASHA-001 · Recorded: 31 Oct 2026</div>
+        </div>
+        <button class="icon-close-btn" id="closeModalBtn" title="Close (Esc)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
   <script>
+    // =========================================================================
+    // Inline SVG Helper Icons (Strictly Zero Emojis)
+    // =========================================================================
+    const SVG_ICONS = {
+      check: `<svg class="icon" viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M20 6L9 17l-5-5"/></svg>`,
+      truck: `<svg class="icon" viewBox="0 0 24 24" style="width:13px;height:13px;"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+      send: `<svg class="icon" viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`,
+      copy: `<svg class="icon" viewBox="0 0 24 24" style="width:13px;height:13px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
+    };
+
     function formatNowTimestamp(isoStr = null) {
       const d = isoStr ? new Date(isoStr) : new Date();
       const datePart = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -1052,19 +1581,83 @@
       return `${datePart} · ${timePart}`;
     }
 
+    function formatCategoryLabel(cat, isPregnant, weeks) {
+      if (isPregnant === false || cat === "GENERAL_VITALS") return "General Vitals";
+      if (cat === "POSTNATAL_PNC") return "Postnatal PNC";
+      if (cat === "FEVER_INFECTION") return "Fever / Infection";
+      return weeks ? `Maternal ANC (${weeks}w)` : "Maternal ANC";
+    }
+
     // =========================================================================
-    // Synthetic Register Data (With Step-by-Step STT -> LLM -> Rule Logs)
+    // Officer Login & Health Telemetry
+    // =========================================================================
+    const loginOverlay = document.getElementById("loginOverlay");
+    const officerNameLabel = document.getElementById("officerNameLabel");
+
+    if (sessionStorage.getItem("asha_officer_logged_in") === "1") {
+      loginOverlay.classList.add("hidden");
+      officerNameLabel.textContent = sessionStorage.getItem("asha_officer_name") || "Dr. A. Verma";
+    }
+
+    function performOfficerLogin(mode) {
+      const email = document.getElementById("loginEmail").value.trim() || "dr.verma@asha-vani.in";
+      const password = document.getElementById("loginPassword").value;
+      fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, mode })
+      })
+        .then(r => r.json())
+        .then(res => {
+          const name = res.officer_name || "Dr. A. Verma";
+          sessionStorage.setItem("asha_officer_logged_in", "1");
+          sessionStorage.setItem("asha_officer_name", name);
+          officerNameLabel.textContent = name;
+          loginOverlay.classList.add("hidden");
+        })
+        .catch(() => {
+          sessionStorage.setItem("asha_officer_logged_in", "1");
+          loginOverlay.classList.add("hidden");
+        });
+    }
+
+    document.getElementById("btnSignIn").addEventListener("click", () => performOfficerLogin("supabase"));
+    document.getElementById("btnDemoLogin").addEventListener("click", () => performOfficerLogin("demo"));
+    document.getElementById("officerChip").addEventListener("click", () => {
+      sessionStorage.removeItem("asha_officer_logged_in");
+      loginOverlay.classList.remove("hidden");
+    });
+
+    fetch("/health")
+      .then(r => r.json())
+      .then(h => {
+        const dot = document.getElementById("supabaseDot");
+        const lbl = document.getElementById("supabaseLabel");
+        if (h.supabase_configured) {
+          dot.classList.remove("amber");
+          lbl.textContent = "Supabase Connected";
+        } else {
+          lbl.textContent = "In-Memory + Local Sync";
+        }
+      })
+      .catch(() => {});
+
+    // =========================================================================
+    // Register Data (Pregnant ANC + Non-Pregnant General/Postnatal Visits)
     // =========================================================================
     const visits = [
       {
         id: "v-101",
         recordedAt: "31 Oct 2026 · 02:14:22 PM",
-        whatHappened: "Severe BP 150/95 + Headache → Rule R2 CRITICAL verified",
+        whatHappened: "Worker: ASHA-001 · Patient: Pooja Devi · BP 150/95 + Headache -> CRITICAL [R2]",
         name: "Pooja Devi",
         spouse: "Ramesh Kumar",
         age: 24,
+        category: "MATERNAL_ANC",
+        isPregnant: true,
         village: "Rampur",
         tola: "Purani Basti",
+        ashaId: "ASHA-001",
         asha: "Sunita Kumari (ASHA-001)",
         weeks: 32,
         bp_sys: 150,
@@ -1074,50 +1667,52 @@
         triage: "CRITICAL",
         rules: ["R2"],
         verification: "VERIFIED",
-        actionStatus: "PENDING",
+        dispatchLabel: null,
         turns: [
           {
             seq: 1,
             timestamp: "31 Oct 2026 · 02:14:10 PM",
-            what_happened: "Captured Pooja Devi W/o Ramesh Kumar, 32w, BP 150/95, Severe Headache → Triggered Rule R2 CRITICAL",
-            stt: "Namaste, Rampur Purani Basti se Pooja Devi patni Ramesh Kumar, 32 hafte, BP dedh sau by pachhanve hai aur subah se tez sar dard hai over",
+            what_happened: "Worker: ASHA-001 · Patient: Pooja Devi (W/o Ramesh Kumar), Rampur · Gestation: 32 wks · BP: 150/95 mmHg · Symptoms: severe headache · Triage: CRITICAL [R2] -> CONFIRM_VALUES",
+            stt: "ASHA ID 001, Rampur Purani Basti se Pooja Devi patni Ramesh Kumar, 32 hafte, BP dedh sau by pachhanve hai aur subah se tez sar dard hai",
             stt_ms: 142,
             llm_json: {
-              gestational_weeks: 32,
-              bp_systolic: 150,
-              bp_diastolic: 95,
-              symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT", phrase: "tez sar dard" }]
+              asha_id: "ASHA-001",
+              patient: { full_name: "Pooja Devi", spouse_or_guardian_name: "Ramesh Kumar", village: "Rampur" },
+              extracted_turn: { gestational_weeks: 32, bp_systolic: 150, bp_diastolic: 95, symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT" }] }
             },
             llm_ms: 285,
             validation: "PASS · Soft warning: confirm elevated BP (150/95)",
-            triage_decision: "CRITICAL — Rule R2 fired (BP ≥ 140/90 with severe headache)",
-            tts_reply: "Kripya confirm karein: Pooja Devi W/o Ramesh Kumar, 32 hafte, BP 1-5-0 by 9-5, lakshan: tez sar dard. Kya yeh sahi hai?"
+            triage_decision: "CRITICAL — Rule R2 fired (BP >= 140/90 with severe headache)",
+            tts_reply: "Didi, kripya confirm karein: Marij Pooja Devi W/o Ramesh Kumar (Rampur), 32 hafte, BP 150 by 95, lakshan: tez sar dard. Kya yeh saari jaankari sahi hai?"
           },
           {
             seq: 2,
             timestamp: "31 Oct 2026 · 02:14:22 PM",
-            what_happened: "ASHA confirmed readback ('Haan ji bilkul sahi hai') → Status flipped to VERIFIED",
-            stt: "Haan ji bilkul sahi hai over",
+            what_happened: "ASHA confirmed readback ('Haan ji bilkul sahi hai') -> Record VERIFIED",
+            stt: "Haan ji bilkul sahi hai",
             stt_ms: 98,
             llm_json: { confirmation: "YES" },
-            llm_ms: 160,
+            llm_ms: 140,
             validation: "COMMITTED_VERIFIED",
-            triage_decision: "CRITICAL [R2] locked · PHC Alert queued (SIM)",
-            tts_reply: "Record verify ho gaya. Yeh CRITICAL screening hai (Rule R2). PHC Rampur ko turant suchit kiya gaya hai."
+            triage_decision: "CRITICAL [R2] locked",
+            tts_reply: "Dhanyavaad Didi! Pooja Devi ka record VERIFY ho gaya hai. Yeh CRITICAL case hai (R2)."
           }
         ]
       },
       {
         id: "v-102",
         recordedAt: "31 Oct 2026 · 01:40:05 PM",
-        whatHappened: "Severe Anemia Hb 6.5 g/dL → Rule R5a URGENT verified",
+        whatHappened: "Worker: ASHA-005 · Non-Pregnant Adult · Severe Anemia Hb 6.5 -> URGENT [R5a]",
         name: "Kavita Devi",
         spouse: "Sanjay Mahto",
-        age: 26,
+        age: 29,
+        category: "GENERAL_VITALS",
+        isPregnant: false,
         village: "Belwa",
         tola: "Dakshin Tola",
-        asha: "Meena Yadav (ASHA-002)",
-        weeks: 28,
+        ashaId: "ASHA-005",
+        asha: "Geeta Devi (ASHA-005)",
+        weeks: null,
         bp_sys: 122,
         bp_dia: 78,
         hb: 6.5,
@@ -1125,37 +1720,40 @@
         triage: "URGENT",
         rules: ["R5a"],
         verification: "VERIFIED",
-        actionStatus: "PENDING",
+        dispatchLabel: null,
         turns: [
           {
             seq: 1,
             timestamp: "31 Oct 2026 · 01:40:05 PM",
-            what_happened: "Captured Kavita Devi W/o Sanjay Mahto, 28w, BP 122/78, Hb 6.5 → Triggered Rule R5a URGENT",
-            stt: "Belwa se Kavita Devi patni Sanjay Mahto, 28 hafte, BP 122 by 78 hai, khoon ki jaanch 6 point 5 aayi hai",
+            what_happened: "Worker: ASHA-005 · Patient: Kavita Devi · Category: General Vitals (Non-Pregnant) · BP: 122/78 · Hb: 6.5 g/dL -> URGENT [R5a]",
+            stt: "ASHA ID 005, Belwa se Kavita Devi patni Sanjay Mahto, pregnant nahi hai, general checkup hai, BP 122 by 78, Hb 6 point 5",
             stt_ms: 155,
             llm_json: {
-              gestational_weeks: 28,
-              bp_systolic: 122,
-              bp_diastolic: 78,
-              hb_g_dl: 6.5
+              asha_id: "ASHA-005",
+              is_pregnant: false,
+              visit_category: "GENERAL_VITALS",
+              extracted_turn: { bp_systolic: 122, bp_diastolic: 78, hb_g_dl: 6.5 }
             },
             llm_ms: 260,
             validation: "PASS",
             triage_decision: "URGENT — Rule R5a fired (Hb < 7.0 g/dL)",
-            tts_reply: "Kripya confirm karein: Kavita Devi, 28 hafte, BP 1-2-2 by 7-8, Hb 6 point 5. Kya yeh sahi hai?"
+            tts_reply: "Didi, kripya confirm karein: Marij Kavita Devi W/o Sanjay Mahto (Belwa), Non-Pregnant Checkup, BP 122 by 78, Hemoglobin 6.5 g/dL."
           }
         ]
       },
       {
         id: "v-103",
         recordedAt: "31 Oct 2026 · 12:55:18 PM",
-        whatHappened: "Routine ANC checkup (24w, BP 116/74, Hb 11.2) → Normal",
+        whatHappened: "Worker: ASHA-002 · Routine ANC checkup (24w, BP 116/74, Hb 11.2)",
         name: "Rinki Kumari",
         spouse: "Manoj Sah",
         age: 21,
+        category: "MATERNAL_ANC",
+        isPregnant: true,
         village: "Rampur",
         tola: "Purani Basti",
-        asha: "Sunita Kumari (ASHA-001)",
+        ashaId: "ASHA-002",
+        asha: "Meena Yadav (ASHA-002)",
         weeks: 24,
         bp_sys: 116,
         bp_dia: 74,
@@ -1164,12 +1762,12 @@
         triage: "ROUTINE",
         rules: [],
         verification: "VERIFIED",
-        actionStatus: "DONE",
+        dispatchLabel: "Home Follow-up Logged",
         turns: [
           {
             seq: 1,
             timestamp: "31 Oct 2026 · 12:55:18 PM",
-            what_happened: "Captured Rinki Kumari W/o Manoj Sah, 24w, BP 116/74, Hb 11.2 → Routine ANC logged",
+            what_happened: "Worker: ASHA-002 · Patient: Rinki Kumari · 24 wks · BP 116/74 · Hb 11.2 -> ROUTINE",
             stt: "Rinki Kumari, 24 hafte, BP 116 by 74, Hb 11 point 2, sab theek hai",
             stt_ms: 130,
             llm_json: { gestational_weeks: 24, bp_systolic: 116, bp_diastolic: 74, hb_g_dl: 11.2 },
@@ -1184,13 +1782,33 @@
 
     const TRIAGE_ORDER = { CRITICAL: 0, URGENT: 1, ROUTINE: 2 };
     let activeTriageFilter = "ALL";
-    let selectedVisitId = "v-101";
+    let selectedVisitId = null;
 
     const registerBody = document.getElementById("registerBody");
-    const patientDrawer = document.getElementById("patientDrawer");
-    const drawerName = document.getElementById("drawerName");
-    const drawerMeta = document.getElementById("drawerMeta");
-    const drawerBody = document.getElementById("drawerBody");
+    const modalBackdrop = document.getElementById("patientModalBackdrop");
+    const modalPatientName = document.getElementById("modalPatientName");
+    const modalCategoryChip = document.getElementById("modalCategoryChip");
+    const modalPatientMeta = document.getElementById("modalPatientMeta");
+    const modalBody = document.getElementById("modalBody");
+
+    function updateStepperBar(visit, nextAction = null) {
+      const steps = [
+        { key: "ASK_ASHA_ID", label: visit?.ashaId ? `01 ${visit.ashaId}` : "01 ASHA ID", done: Boolean(visit?.ashaId) },
+        { key: "ASK_PATIENT_NAME", label: visit?.name && !visit.name.startsWith("Listening") ? `02 ${visit.name.split(" ")[0]}` : "02 Patient", done: Boolean(visit?.name && !visit.name.startsWith("Listening")) },
+        { key: "ASK_SPOUSE_NAME", label: visit?.spouse && visit.spouse !== "Pending..." && visit.spouse !== "—" ? `03 ${visit.spouse.split(" ")[0]}` : "03 Spouse", done: Boolean(visit?.spouse && visit.spouse !== "Pending..." && visit.spouse !== "—") },
+        { key: "ASK_WEEKS", label: visit?.isPregnant === false ? "04 Non-Preg" : (visit?.weeks ? `04 ${visit.weeks}w ANC` : "04 Category/Wks"), done: Boolean(visit?.weeks != null || visit?.isPregnant === false) },
+        { key: "ASK_BP", label: visit?.bp_sys ? `05 BP ${visit.bp_sys}/${visit.bp_dia}` : "05 Blood Pressure", done: Boolean(visit?.bp_sys != null && visit?.bp_dia != null) },
+        { key: "ASK_HB", label: visit?.hb ? `06 Hb ${visit.hb}` : "06 Hb & Signs", done: Boolean(visit?.hb != null) },
+        { key: "CONFIRM_VALUES", label: visit?.verification === "VERIFIED" ? "07 Verified" : "07 Readback", done: visit?.verification === "VERIFIED" }
+      ];
+
+      const track = document.getElementById("stepperTrack");
+      track.innerHTML = steps.map(s => {
+        const isCurrent = nextAction === s.key && !s.done;
+        const cls = s.done ? "step-pill done" : (isCurrent ? "step-pill active" : "step-pill");
+        return `<div class="${cls}"><span>${s.label}</span>${s.done ? SVG_ICONS.check : ""}</div>`;
+      }).join("");
+    }
 
     function renderTable(flashId = null) {
       const villageVal = document.getElementById("villageFilter").value;
@@ -1201,7 +1819,7 @@
         .filter(v => v.isLive || activeTriageFilter === "ALL" || v.triage === activeTriageFilter)
         .filter(v => v.isLive || villageVal === "ALL" || v.village === villageVal)
         .filter(v => v.isLive || verifyVal === "ALL" || v.verification === verifyVal)
-        .filter(v => !query || v.name.toLowerCase().includes(query) || v.asha.toLowerCase().includes(query))
+        .filter(v => !query || v.name.toLowerCase().includes(query) || v.asha.toLowerCase().includes(query) || (v.village || "").toLowerCase().includes(query))
         .sort((a, b) => {
           if (a.isLive && !b.isLive) return -1;
           if (!a.isLive && b.isLive) return 1;
@@ -1210,17 +1828,19 @@
 
       registerBody.innerHTML = filtered.map(v => {
         const ruleStr = v.rules.length ? ` · ${v.rules.join(",")}` : "";
-        const isSelected = v.id === selectedVisitId ? "selected" : "";
         const isFlash = v.id === flashId ? "flash-new" : "";
-        const actionLabel = v.actionStatus === "DONE" ? "Referred ✓" : "Pending → Refer";
-        const actionClass = v.actionStatus === "DONE" ? "done" : "pending";
+        const catStr = formatCategoryLabel(v.category, v.isPregnant, v.weeks);
+        const weeksStr = v.isPregnant === false ? "N/A" : (v.weeks != null ? `${v.weeks}w` : "—");
+        const dispatchHtml = v.dispatchLabel
+          ? `<button class="dispatch-btn dispatched" onclick="openModal('${v.id}')">${SVG_ICONS.check}<span>${v.dispatchLabel}</span></button>`
+          : `<button class="dispatch-btn" onclick="quickDispatch('${v.id}', event)">${SVG_ICONS.truck}<span>Dispatch Home</span></button>`;
 
         return `
-          <tr class="${isSelected} ${isFlash}" onclick="openDrawer('${v.id}')">
+          <tr class="${isFlash}" onclick="openModal('${v.id}')">
             <td>
               <div class="patient-cell">
                 <span class="mono-val" style="font-size: 11px;">${v.recordedAt || formatNowTimestamp()}</span>
-                <span class="patient-sub" style="max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${v.whatHappened || ''}">${v.whatHappened || "Live ANC Call"}</span>
+                <span class="patient-sub" style="max-width: 185px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${v.whatHappened || ''}">${v.whatHappened || "Live Call"}</span>
               </div>
             </td>
             <td>
@@ -1229,14 +1849,20 @@
                 <span class="patient-sub">W/o ${v.spouse} · Age ${v.age}</span>
               </div>
             </td>
+            <td><span class="category-chip">${catStr}</span></td>
             <td>
               <div class="patient-cell">
                 <span>${v.village}</span>
                 <span class="patient-sub">${v.tola}</span>
               </div>
             </td>
-            <td>${v.asha}</td>
-            <td class="mono-val">${v.weeks ?? "—"}w</td>
+            <td>
+              <div class="patient-cell">
+                <span class="mono-val" style="font-size: 11.5px;">${v.ashaId || "ASHA-001"}</span>
+                <span class="patient-sub">${v.asha.replace(/\(.*\)/, "").trim()}</span>
+              </div>
+            </td>
+            <td class="mono-val">${weeksStr}</td>
             <td class="mono-val">${v.bp_sys ? `${v.bp_sys}/${v.bp_dia}` : "—"}</td>
             <td class="mono-val">${v.hb ?? "—"}</td>
             <td>
@@ -1244,49 +1870,90 @@
             </td>
             <td>
               <span class="verify-badge verify-${v.verification}">
-                ${v.verification === "UNVERIFIED" ? "UNVERIFIED (In Call)" : v.verification}
+                ${v.verification === "VERIFIED" ? SVG_ICONS.check : ""}
+                <span>${v.verification === "UNVERIFIED" ? "UNVERIFIED (In Call)" : "VERIFIED"}</span>
               </span>
             </td>
             <td onclick="event.stopPropagation()">
-              <button class="action-pill ${actionClass}" onclick="toggleAction('${v.id}')">
-                ${actionLabel}
-              </button>
+              ${dispatchHtml}
             </td>
           </tr>
         `;
       }).join("");
 
-      // Update top summary counters
+      const uniqueWorkers = new Set(visits.map(v => v.ashaId || v.asha)).size;
       document.getElementById("statTotal").textContent = visits.length;
       document.getElementById("statCrit").textContent = visits.filter(v => v.triage === "CRITICAL").length;
       document.getElementById("statUrg").textContent = visits.filter(v => v.triage === "URGENT").length;
-      document.getElementById("statPending").textContent = visits.filter(v => v.actionStatus === "PENDING").length;
+      document.getElementById("statWorkers").textContent = uniqueWorkers;
+      document.getElementById("statDispatched").textContent = visits.filter(v => Boolean(v.dispatchLabel)).length;
     }
 
-    function toggleAction(id) {
-      const item = visits.find(v => v.id === id);
+    function dispatchUnitToHome(visitId, unitType, etaMinutes) {
+      const item = visits.find(v => v.id === visitId);
       if (!item) return;
-      item.actionStatus = item.actionStatus === "DONE" ? "PENDING" : "DONE";
-      renderTable();
-      if (selectedVisitId === id) renderDrawerContent(item);
+      const labels = {
+        "108_UNIT": `108 Unit · ${etaMinutes}m ETA`,
+        "ANM_MOBILE": `ANM Van · ${etaMinutes}m ETA`,
+        "HOME_VISIT": "Home Follow-up Logged"
+      };
+      item.dispatchLabel = labels[unitType] || unitType;
+      item.whatHappened = `Dispatched ${item.dispatchLabel} to ${item.village} (${item.tola})`;
+      renderTable(visitId);
+      if (selectedVisitId === visitId) renderModalContent(item);
+
+      if (location.protocol !== "file:") {
+        fetch("/api/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visit_id: visitId, unit_type: unitType, eta_minutes: etaMinutes })
+        }).catch(() => {});
+      }
     }
 
-    function openDrawer(id) {
+    function quickDispatch(visitId, ev) {
+      if (ev) ev.stopPropagation();
+      const item = visits.find(v => v.id === visitId);
+      if (!item) return;
+      if (item.triage === "CRITICAL") {
+        dispatchUnitToHome(visitId, "108_UNIT", 12);
+      } else if (item.triage === "URGENT") {
+        dispatchUnitToHome(visitId, "ANM_MOBILE", 22);
+      } else {
+        dispatchUnitToHome(visitId, "HOME_VISIT", 0);
+      }
+    }
+
+    function openModal(id) {
       selectedVisitId = id;
       const item = visits.find(v => v.id === id);
       if (!item) return;
-      renderDrawerContent(item);
-      patientDrawer.classList.add("open");
-      renderTable();
+      renderModalContent(item);
+      modalBackdrop.classList.add("open");
     }
 
-    function renderDrawerContent(v) {
-      drawerName.textContent = v.name;
-      drawerMeta.textContent = `W/o ${v.spouse} · ${v.village} (${v.tola}) · Age ${v.age} · Recorded: ${v.recordedAt || "Just now"}`;
+    function closeModal() {
+      modalBackdrop.classList.remove("open");
+      selectedVisitId = null;
+    }
+
+    function copyReferralSlip(id) {
+      const v = visits.find(x => x.id === id);
+      if (!v) return;
+      const text = `ASHA-VANI REFERRAL TOKEN [${v.id.toUpperCase()}] | Patient: ${v.name} W/o ${v.spouse} | Location: ${v.village} (${v.tola}) | Worker: ${v.asha} | Vitals: BP ${v.bp_sys || "--"}/${v.bp_dia || "--"}, Hb ${v.hb || "--"} | Triage: ${v.triage} (${v.rules.join(",") || "Routine"}) | Recorded: ${v.recordedAt}`;
+      navigator.clipboard?.writeText(text);
+      const btn = document.getElementById("copySlipBtn");
+      if (btn) btn.innerHTML = `${SVG_ICONS.check}<span>Copied Referral Token</span>`;
+    }
+
+    function renderModalContent(v) {
+      modalPatientName.textContent = v.name;
+      modalCategoryChip.textContent = formatCategoryLabel(v.category, v.isPregnant, v.weeks);
+      modalPatientMeta.textContent = `W/o ${v.spouse} · ${v.village} (${v.tola}) · ${v.asha} · Recorded: ${v.recordedAt || "Just now"}`;
 
       const symptomsHtml = v.symptoms.length
-        ? v.symptoms.map(s => `<span class="symptom-chip">${s}</span>`).join("")
-        : `<span class="symptom-chip" style="color: var(--text-muted)">None reported</span>`;
+        ? v.symptoms.map(s => `<span class="category-chip">${s}</span>`).join(" ")
+        : `<span class="category-chip" style="color: var(--text-muted)">No danger signs reported</span>`;
 
       const turnsHtml = v.turns.length ? v.turns.map(t => `
         <div class="turn-card">
@@ -1295,15 +1962,15 @@
             <span>STT ${t.stt_ms}ms · Graph ${t.llm_ms}ms</span>
           </div>
           <div class="step-row">
-            <span class="step-tag">WHAT HAPPENED</span>
-            <span class="step-val" style="font-weight: 600; color: #111827;">${t.what_happened || "Processed spoken turn"}</span>
+            <span class="step-tag">ENGLISH SUMMARY</span>
+            <span class="step-val" style="font-weight: 600;">${t.what_happened || "Processed spoken turn"}</span>
           </div>
           <div class="step-row">
-            <span class="step-tag">1. PRISMA STT</span>
+            <span class="step-tag">1. SPOKEN INPUT</span>
             <span class="step-val">"${t.stt}"</span>
           </div>
           <div class="step-row">
-            <span class="step-tag">2. LLM EXTRACT</span>
+            <span class="step-tag">2. GROQ EXTRACT</span>
             <code class="code-inline">${JSON.stringify(t.llm_json, null, 2)}</code>
           </div>
           <div class="step-row">
@@ -1315,30 +1982,36 @@
             <span class="step-val" style="font-weight: 600;">${t.triage_decision}</span>
           </div>
           <div class="step-row">
-            <span class="step-tag">5. TIMBRE TTS</span>
+            <span class="step-tag">5. TIMBRE v2.5</span>
             <span class="step-val" style="color: var(--text-secondary);">"${t.tts_reply}"</span>
           </div>
         </div>
-      `).join("") : `<div class="turn-card" style="color: var(--text-muted); font-size: 12px;">Live call connected — waiting for Turn #1 (speak into mic or click OVER ↵)...</div>`;
+      `).join("") : `<div class="turn-card" style="color: var(--text-muted); font-size: 12px;">Call connected — speak into mic or type on Nokia keypad and press SEND.</div>`;
 
-      const priorVisits = v.patientId
-        ? visits.filter(item => item.patientId === v.patientId && item.id !== v.id && item.verification === "VERIFIED")
-        : [];
-      const historyHtml = priorVisits.length ? `
-        <div>
-          <div class="section-heading"><span>Previous Verified Visits</span><span>${priorVisits.length}</span></div>
-          ${priorVisits.map(item => `
-            <div class="turn-card">
-              <div class="turn-head"><span>${item.recordedAt}</span><span class="triage-badge triage-${item.triage}">${item.triage}</span></div>
-              <div class="step-row"><span class="step-tag">VISIT ${item.visitNumber || "—"}</span>
-                <span class="step-val">${item.weeks ?? "—"} weeks · BP ${item.bp_sys ?? "—"}/${item.bp_dia ?? "—"} · Hb ${item.hb ?? "—"}</span></div>
-            </div>`).join("")}
-        </div>` : "";
-
-      drawerBody.innerHTML = `
+      modalBody.innerHTML = `
         <div>
           <div class="section-heading">
-            <span>Final Visit Report · ${v.verification}</span>
+            <span>Home Dispatch & Field Response</span>
+            <span class="mono-val" style="font-size: 11px; color: var(--text-secondary);">Status: ${v.dispatchLabel || "Awaiting Dispatcher"}</span>
+          </div>
+          <div class="dispatch-bar">
+            <div class="dispatch-options">
+              <button class="dispatch-opt-btn primary-crit" onclick="dispatchUnitToHome('${v.id}', '108_UNIT', 12)">
+                ${SVG_ICONS.truck}<span>Dispatch 108 Unit (12m ETA)</span>
+              </button>
+              <button class="dispatch-opt-btn" onclick="dispatchUnitToHome('${v.id}', 'ANM_MOBILE', 22)">
+                ${SVG_ICONS.truck}<span>Assign ANM Mobile Van (22m ETA)</span>
+              </button>
+              <button class="dispatch-opt-btn" onclick="dispatchUnitToHome('${v.id}', 'HOME_VISIT', 0)">
+                ${SVG_ICONS.check}<span>Log ASHA Home Follow-up</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-heading">
+            <span>Sanitized Clinical Vitals</span>
             <span class="triage-badge triage-${v.triage}">${v.triage} ${v.rules.length ? "(" + v.rules.join(", ") + ")" : ""}</span>
           </div>
           <div class="vitals-grid">
@@ -1351,28 +2024,43 @@
               <div class="vital-num">${v.hb ? `${v.hb} g/dL` : "—"}</div>
             </div>
             <div class="vital-box">
-              <div class="vital-label">Gestation</div>
-              <div class="vital-num">${v.weeks ? `${v.weeks} wks` : "—"}</div>
+              <div class="vital-label">Gestation / Type</div>
+              <div class="vital-num">${v.isPregnant === false ? "Non-Pregnant" : (v.weeks ? `${v.weeks} wks` : "—")}</div>
+            </div>
+            <div class="vital-box">
+              <div class="vital-label">ASHA Worker ID</div>
+              <div class="vital-num">${v.ashaId || "ASHA-001"}</div>
             </div>
           </div>
-          <div class="symptom-chips">${symptomsHtml}</div>
+          <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">${symptomsHtml}</div>
         </div>
 
-        ${historyHtml}
+        <div class="referral-slip">
+          <div>
+            <div style="font-weight: 600;">DIGITAL REFERRAL SLIP · TOKEN #${v.id.toUpperCase()}</div>
+            <div style="color: var(--text-secondary); margin-top: 2px;">${v.name} (W/o ${v.spouse}) · ${v.village} · Triage: ${v.triage} ${v.rules.join(",")}</div>
+          </div>
+          <button class="dispatch-opt-btn" id="copySlipBtn" onclick="copyReferralSlip('${v.id}')">
+            ${SVG_ICONS.copy}<span>Copy Referral Slip</span>
+          </button>
+        </div>
 
-        <details>
-          <summary class="section-heading" style="cursor: pointer;">Voice & Rule Pipeline Details · ${v.turns.length} turns</summary>
+        <div>
+          <div class="section-heading">
+            <span>Step-by-Step Voice & Rule Pipeline Log</span>
+            <span style="font-family: var(--font-mono); font-size: 10px;">LLM extracts · Deterministic code decides</span>
+          </div>
           <div style="display: flex; flex-direction: column; gap: 10px;">
             ${turnsHtml}
           </div>
-        </details>
+        </div>
       `;
     }
 
-    document.getElementById("closeDrawerBtn").addEventListener("click", () => {
-      patientDrawer.classList.remove("open");
-      selectedVisitId = null;
-      renderTable();
+    document.getElementById("closeModalBtn").addEventListener("click", closeModal);
+    modalBackdrop.addEventListener("click", closeModal);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
     });
 
     // Filters
@@ -1388,19 +2076,74 @@
     document.getElementById("verifyFilter").addEventListener("change", () => renderTable());
     document.getElementById("searchInput").addEventListener("input", () => renderTable());
 
-    // Noise selector on Nokia dock
+    // Noise selector
     document.querySelectorAll("#noiseGroup .noise-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("#noiseGroup .noise-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         const mode = btn.dataset.noise;
-        document.getElementById("snrLabel").textContent = mode === "CLEAN" ? "Off" : mode;
+        document.getElementById("snrLabel").textContent = mode === "CLEAN" ? "Clean" : mode;
         document.getElementById("lcdNoiseTag").textContent = mode;
       });
     });
 
     // =========================================================================
-    // Live Backend WebSocket (/ws/call & /ws/console) + Laptop Mic & Speaker
+    // WebAudio DTMF Tone Synthesizer + Keypad Input ("Noisy Village Jugaad")
+    // =========================================================================
+    const DTMF_FREQS = {
+      "1": [697, 1209], "2": [697, 1336], "3": [697, 1477],
+      "4": [770, 1209], "5": [770, 1336], "6": [770, 1477],
+      "7": [852, 1209], "8": [852, 1336], "9": [852, 1477],
+      "*": [941, 1209], "0": [941, 1336], "#": [941, 1477]
+    };
+    let dtmfBuffer = "";
+    let audioCtx = null;
+    const lcdDtmf = document.getElementById("lcdDtmf");
+
+    function playDtmfTone(key) {
+      const pair = DTMF_FREQS[key];
+      if (!pair) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc1.frequency.value = pair[0];
+        osc2.frequency.value = pair[1];
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.11);
+        osc2.stop(now + 0.11);
+      } catch (_) {}
+    }
+
+    document.querySelectorAll("#dtmfKeypad .key-num").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const k = btn.dataset.key;
+        playDtmfTone(k);
+        if (k === "#") {
+          if (dtmfBuffer.trim()) {
+            const toSend = dtmfBuffer.trim();
+            dtmfBuffer = "";
+            lcdDtmf.classList.remove("visible");
+            sendUtteranceToBackend(toSend);
+          }
+          return;
+        }
+        dtmfBuffer += k;
+        lcdDtmf.textContent = `DTMF Keypad: ${dtmfBuffer} (Press # or SEND)`;
+        lcdDtmf.classList.add("visible");
+      });
+    });
+
+    // =========================================================================
+    // Live Backend WebSocket (/ws/call & /ws/console) + Half-Duplex Mic/Speaker
     // =========================================================================
     const nokiaLcd = document.getElementById("nokiaLcd");
     const lcdStatus = document.getElementById("lcdStatus");
@@ -1430,7 +2173,7 @@
     let ttsStreamActive = false;
     let ttsFailed = false;
     let pendingGreeting = "";
-    const SILENCE_WAIT_MS = 5000; // Wait 5.0 full seconds of silence (or say/click 'OVER') so ASHA can think & speak slowly
+    const SILENCE_WAIT_MS = 5000;
 
     function formatTimer(sec) {
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
@@ -1532,6 +2275,38 @@
       try { recognition.start(); } catch (_) {}
     }
 
+    async function hydrateSavedRegister() {
+      try {
+        const response = await fetch("/api/register");
+        if (!response.ok) return;
+        const saved = await response.json();
+        for (const row of (saved.events || [])) {
+          const event = {
+            session_id: row.session_id,
+            event_type: row.event_type,
+            timestamp: row.occurred_at,
+            payload: row.payload || {}
+          };
+          if (event.event_type === "call_started") {
+            ensureLiveVisitStarted(event.session_id, event.timestamp);
+          } else if (event.event_type === "turn_completed") {
+            applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
+          } else if (event.event_type === "call_ended") {
+            const visit = visits.find(v => v.id === `live-${event.session_id}`);
+            if (visit) {
+              visit.isLive = false;
+              if (event.payload?.final_verification === "INCOMPLETE") {
+                visit.verification = "INCOMPLETE";
+              }
+            }
+          }
+        }
+        renderTable();
+      } catch (err) {
+        console.warn("Saved register could not be loaded:", err);
+      }
+    }
+
     function connectConsoleWebSocket() {
       if (location.protocol === "file:") return;
       if (consoleWs && (consoleWs.readyState === WebSocket.OPEN || consoleWs.readyState === WebSocket.CONNECTING)) {
@@ -1548,12 +2323,20 @@
           } else if (event.event_type === "turn_completed") {
             applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
           } else if (event.event_type === "call_ended") {
-            for (const visit of visits.filter(v => v.sessionId === event.session_id)) {
+            for (const visit of visits.filter(v => v.sessionId === event.session_id || v.id === `live-${event.session_id}`)) {
               visit.isLive = false;
               if (Number(visit.visitNumber || 1) === Number(event.payload?.visit_number || 1)
-                  && event.payload?.final_verification === "INCOMPLETE") visit.verification = "INCOMPLETE";
+                  && event.payload?.final_verification === "INCOMPLETE") {
+                visit.verification = "INCOMPLETE";
+              }
             }
             renderTable();
+          } else if (event.event_type === "dispatch_updated" && event.payload) {
+            const item = visits.find(v => v.id === event.payload.visit_id);
+            if (item) {
+              item.dispatchLabel = event.payload.label;
+              renderTable();
+            }
           }
         } catch (err) {
           console.warn("Console WS parse error:", err);
@@ -1564,84 +2347,10 @@
       };
     }
 
-    async function hydrateSavedRegister() {
-      try {
-        const response = await fetch("/api/register");
-        if (!response.ok) return;
-        const saved = await response.json();
-        if (saved.available === false) return;
-        if (saved.configured && Array.isArray(saved.visits)) {
-          const events = saved.events || [];
-          const calls = new Map((saved.calls || []).map(call => [call.session_id, call]));
-          const reports = saved.visits.map(row => savedRowToVisit(row, events, calls));
-          // Once persistence is configured, saved visit reports are the register source of truth.
-          visits.splice(0, visits.length, ...reports);
-        }
-        renderTable();
-      } catch (err) {
-        console.warn("Saved register could not be loaded:", err);
-      }
-    }
-
-    function savedRowToVisit(row, eventRows, calls) {
-      const report = row.final_report || {};
-      const patient = report.patient || row.patient || {};
-      const values = report.visit_values || row.visit_values || {};
-      const triage = report.triage || row.triage || {};
-      const sessionId = row.session_id;
-      const visitNumber = Number(row.visit_number || 1);
-      const call = calls.get(sessionId) || {};
-      const turns = eventRows.filter(event => event.event_type === "turn_completed"
-        && event.session_id === sessionId
-        && Number(event.payload?.visit_number || 1) === visitNumber).map(event => {
-          const payload = event.payload || {};
-          const turnPatient = payload.patient || patient;
-          const turnValues = payload.visit_values || values;
-          const turnTriage = payload.triage || triage;
-          return {
-            seq: payload.utterance_seq,
-            timestamp: formatNowTimestamp(event.occurred_at),
-            what_happened: describeWhatHappened(payload, turnPatient, turnValues, turnTriage),
-            stt: payload.stt_transcript || "",
-            stt_ms: payload.latencies_ms?.stt ?? 0,
-            llm_json: { patient: turnPatient, extracted_turn: payload.extracted_turn || {} },
-            llm_ms: payload.latencies_ms?.graph ?? 0,
-            validation: (payload.validation_issues || []).map(issue => `${issue.severity}: ${issue.message}`).join(" | ") || "PASS",
-            triage_decision: `${turnTriage.level || "ROUTINE"} · ${(turnTriage.rules_fired || []).join(", ") || "no rules"}`,
-            tts_reply: payload.reply_text || ""
-          };
-        });
-      return {
-        id: `saved-${sessionId}-${visitNumber}`,
-        sessionId,
-        visitNumber,
-        patientId: row.patient_id || report.patient_id || null,
-        isLive: false,
-        recordedAt: formatNowTimestamp(row.finalized_at || row.updated_at),
-        whatHappened: `Visit ${visitNumber} · ${call.source || "CALL"} · ${row.verification}`,
-        name: patient.full_name || "Unknown patient",
-        spouse: patient.spouse_or_guardian_name || "—",
-        age: patient.age_years ?? "—",
-        village: patient.village || "—",
-        tola: patient.tola || "—",
-        asha: call.caller || "ASHA caller",
-        weeks: values.gestational_weeks ?? null,
-        bp_sys: values.bp_systolic ?? null,
-        bp_dia: values.bp_diastolic ?? null,
-        hb: values.hb_g_dl ?? null,
-        symptoms: (values.symptoms || []).filter(item => item.presence === "PRESENT").map(item => item.code),
-        triage: triage.level || "ROUTINE",
-        rules: triage.rules_fired || [],
-        verification: row.verification || "UNVERIFIED",
-        actionStatus: "PENDING",
-        turns
-      };
-    }
-
     function ensureLiveVisitStarted(sessionId, eventIsoTime = null) {
       if (!sessionId) return;
       const vid = `live-${sessionId}-1`;
-      let visit = visits.find(v => v.id === vid);
+      let visit = visits.find(v => v.id === vid || v.id === `live-${sessionId}`);
       const formattedTime = formatNowTimestamp(eventIsoTime);
       if (!visit) {
         visit = {
@@ -1651,13 +2360,16 @@
           patientId: null,
           isLive: true,
           recordedAt: formattedTime,
-          whatHappened: "Call Connected → Asking for Patient Name & Village",
-          name: "Listening for Patient Name...",
+          whatHappened: "Call Connected -> Asking for ASHA Worker ID",
+          name: "Listening for Patient...",
           spouse: "Pending...",
           age: "—",
+          category: "MATERNAL_ANC",
+          isPregnant: null,
           village: "Rampur",
           tola: "—",
-          asha: "Sunita Kumari (ASHA-001 · Live)",
+          ashaId: null,
+          asha: "Identifying ASHA ID...",
           weeks: null,
           bp_sys: null,
           bp_dia: null,
@@ -1666,42 +2378,22 @@
           triage: "ROUTINE",
           rules: [],
           verification: "UNVERIFIED",
-          actionStatus: "PENDING",
+          dispatchLabel: null,
           turns: []
         };
         visits.unshift(visit);
       }
-      openDrawer(vid);
+      document.getElementById("stepperStatusText").textContent = `Live Call Active (${sessionId}) · Step 01`;
+      document.getElementById("stepperEnglishSub").textContent = "Prompting for 3-digit ASHA Worker ID (say 'ASHA ID 005' or dial 005#)";
+      updateStepperBar(visit, "ASK_ASHA_ID");
       renderTable(vid);
-    }
-
-    function describeWhatHappened(payload, patient, vals, triage) {
-      const actionLabels = {
-        ASK_PATIENT_NAME: "Asking for Patient Name & Village",
-        ASK_SPOUSE_NAME: "Asking for Husband / Spouse Name",
-        ASK_WEEKS: "Asking for Pregnancy Weeks",
-        ASK_BP: "Asking for Blood Pressure (BP)",
-        ASK_HB: "Asking for Hemoglobin (Hb) & Symptoms",
-        REPEAT_VALUE: "Validation refused out-of-range value → Asking to repeat",
-        CONFIRM_VALUES: `All checks captured → Reading back for confirmation (${triage.level})`,
-        COMMITTED_VERIFIED: `Confirmed & Verified (${triage.level})`
-      };
-      const nextStep = actionLabels[payload.next_action] || payload.next_action || "Updated visit";
-      const parts = [];
-      if (patient.full_name) parts.push(`Patient: ${patient.full_name}`);
-      if (patient.spouse_or_guardian_name) parts.push(`W/o ${patient.spouse_or_guardian_name}`);
-      if (vals.gestational_weeks != null) parts.push(`${vals.gestational_weeks}w`);
-      if (vals.bp_systolic != null && vals.bp_diastolic != null) parts.push(`BP ${vals.bp_systolic}/${vals.bp_diastolic}`);
-      if (vals.hb_g_dl != null) parts.push(`Hb ${vals.hb_g_dl}`);
-      const capturedStr = parts.length ? parts.join(", ") : "Greeting / Initial turn";
-      return `${capturedStr} → ${nextStep}`;
     }
 
     function applyLiveBackendTurn(sessionId, payload, eventIsoTime = null) {
       if (!sessionId || !payload) return;
       const visitNumber = Number(payload.visit_number || 1);
       const vid = `live-${sessionId}-${visitNumber}`;
-      let visit = visits.find(v => v.id === vid);
+      let visit = visits.find(v => v.id === vid || (visitNumber === 1 && v.id === `live-${sessionId}`));
       const patient = payload.patient || {};
       const vals = payload.visit_values || {};
       const triage = payload.triage || payload.triage_result || { level: "ROUTINE", rules_fired: [] };
@@ -1711,15 +2403,18 @@
         .filter(s => s.presence === "PRESENT")
         .map(s => s.code);
       const formattedTime = formatNowTimestamp(eventIsoTime);
-      const summaryText = describeWhatHappened(payload, patient, vals, triage);
+      const englishSum = payload.english_summary || `Next: ${payload.next_action}`;
 
       const turnEntry = {
         seq: payload.utterance_seq,
         timestamp: formattedTime,
-        what_happened: summaryText,
+        what_happened: englishSum,
         stt: transcriptText,
         stt_ms: payload.latencies_ms?.stt ?? 120,
         llm_json: {
+          asha_id: payload.asha_id,
+          visit_category: payload.visit_category,
+          is_pregnant: payload.is_pregnant,
           patient: patient,
           extracted_turn: payload.extracted_turn
         },
@@ -1734,18 +2429,18 @@
       if (!visit) {
         visit = {
           id: vid,
-          sessionId,
-          visitNumber,
-          patientId: payload.matched_patient_id || null,
           isLive: true,
           recordedAt: formattedTime,
-          whatHappened: summaryText,
-          name: patient.full_name || "Listening for Patient Name...",
+          whatHappened: englishSum,
+          name: patient.full_name || "Listening for Patient...",
           spouse: patient.spouse_or_guardian_name || "Pending...",
           age: patient.age_years || "—",
+          category: payload.visit_category || "MATERNAL_ANC",
+          isPregnant: payload.is_pregnant,
           village: patient.village || "Rampur",
           tola: patient.tola || "—",
-          asha: "Sunita Kumari (ASHA-001 · Live)",
+          ashaId: payload.asha_id || null,
+          asha: payload.asha_name || "Identifying ASHA...",
           weeks: vals.gestational_weeks,
           bp_sys: vals.bp_systolic,
           bp_dia: vals.bp_diastolic,
@@ -1754,14 +2449,18 @@
           triage: triage.level,
           rules: triage.rules_fired || [],
           verification: payload.verification || "UNVERIFIED",
-          actionStatus: "PENDING",
+          dispatchLabel: null,
           turns: [turnEntry]
         };
         visits.unshift(visit);
       } else {
         visit.isLive = true;
         visit.recordedAt = formattedTime;
-        visit.whatHappened = summaryText;
+        visit.whatHappened = englishSum;
+        if (payload.asha_id) visit.ashaId = payload.asha_id;
+        if (payload.asha_name) visit.asha = payload.asha_name;
+        if (payload.visit_category) visit.category = payload.visit_category;
+        if (payload.is_pregnant !== undefined && payload.is_pregnant !== null) visit.isPregnant = payload.is_pregnant;
         if (patient.full_name) visit.name = patient.full_name;
         if (patient.spouse_or_guardian_name) visit.spouse = patient.spouse_or_guardian_name;
         if (patient.age_years) visit.age = patient.age_years;
@@ -1775,7 +2474,6 @@
         visit.triage = triage.level;
         visit.rules = triage.rules_fired || [];
         visit.verification = payload.verification || visit.verification;
-        if (payload.matched_patient_id) visit.patientId = payload.matched_patient_id;
         const existingIdx = visit.turns.findIndex(t => t.seq === turnEntry.seq);
         if (existingIdx === -1) {
           visit.turns.push(turnEntry);
@@ -1784,8 +2482,14 @@
         }
       }
 
-      openDrawer(vid);
+      document.getElementById("stepperStatusText").textContent = `Live Call · Turn #${payload.utterance_seq} · ${payload.next_action}`;
+      document.getElementById("stepperEnglishSub").textContent = englishSum;
+      updateStepperBar(visit, payload.next_action);
+
       renderTable(vid);
+      if (selectedVisitId === vid) {
+        renderModalContent(visit);
+      }
     }
 
     function pauseMicForTTS() {
@@ -1801,13 +2505,12 @@
     }
 
     function resumeMicAfterTTS() {
-      // 300 ms anti-echo tail mute after speaker audio completely finishes
       setTimeout(() => {
         if (!isCallActive) return;
         isHalfDuplexMuted = false;
         accumulatedSpeech = "";
         interimSpeech = "";
-        lcdStatus.textContent = "Listening (Speak)...";
+        lcdStatus.textContent = "Listening (Speak / Keypad)...";
         lcdDuplex.textContent = "MIC LIVE";
         if (recognition) {
           try { recognition.start(); } catch (_) {}
@@ -1871,12 +2574,13 @@
       const cleaned = (text || "").replace(/\b(over|ओवर)\s*[.,!?]*$/i, "").trim();
       accumulatedSpeech = "";
       interimSpeech = "";
+      dtmfBuffer = "";
+      lcdDtmf.classList.remove("visible");
       if (!cleaned) return;
 
-      // Immediately mute mic while backend + TTS processes the turn
       pauseMicForTTS();
       lcdStatus.textContent = "Processing Turn...";
-      lcdSub.textContent = `You said: "${cleaned}"`;
+      lcdSub.textContent = `Input: "${cleaned}"`;
 
       if (callWs && callWs.readyState === WebSocket.OPEN) {
         callWs.send(JSON.stringify({
@@ -1905,9 +2609,10 @@
       callSeconds = 0;
       accumulatedSpeech = "";
       interimSpeech = "";
+      dtmfBuffer = "";
       connectConsoleWebSocket();
       nokiaLcd.classList.add("active-call");
-      lcdStatus.textContent = "Connecting PHC...";
+      lcdStatus.textContent = "Connecting Line...";
       lcdDuplex.textContent = "MIC MUTED (Greeting)";
       lcdSub.textContent = "Connecting to ASHA-Vani...";
 
@@ -1977,7 +2682,7 @@
         });
       } else {
         speakReplyHalfDuplex(
-          "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?"
+          "Namaste Didi! ASHA-Vani mein aapka swagat hai. Kripya apna teen ank ka ASHA ID batayein, jaise zero zero paanch."
         );
       }
     }
@@ -2015,13 +2720,17 @@
     document.getElementById("btnCall").addEventListener("click", startLiveCall);
     document.getElementById("btnEnd").addEventListener("click", endLiveCall);
     document.getElementById("btnOver").addEventListener("click", () => {
+      if (dtmfBuffer.trim()) {
+        sendUtteranceToBackend(dtmfBuffer.trim());
+        return;
+      }
       const currentSpoken = (accumulatedSpeech + " " + interimSpeech).trim();
       if (currentSpoken) {
         sendUtteranceToBackend(currentSpoken);
       } else {
         const manual = prompt(
-          "Enter ASHA utterance in Hinglish/English:",
-          "Rampur se Pooja Devi patni Ramesh Kumar, 32 hafte, BP 150 by 95 hai aur tez sar dard hai"
+          "Speak into mic, dial keypad digits, or type utterance here:",
+          "ASHA ID 005"
         );
         if (manual) sendUtteranceToBackend(manual);
       }
@@ -2035,16 +2744,23 @@
       lcdDuplex.textContent = "MIC LIVE";
 
       if (kind === "critical") {
-        lcdSub.innerHTML = "Speaking: 'Anita Devi BP 165/112, sar dard... OVER'";
+        lcdSub.textContent = "Speaking: 'ASHA 003, Anita Devi BP 165/112, sar dard...'";
         const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const nowStr = formatNowTimestamp();
         const liveVisit = {
           id: newId,
+          isLive: true,
+          recordedAt: nowStr,
+          whatHappened: "Worker: ASHA-003 · Patient: Anita Devi · BP 165/112 + Severe Headache -> CRITICAL [R1, R2]",
           name: "Anita Devi",
           spouse: "Vijay Ram",
           age: 29,
+          category: "MATERNAL_ANC",
+          isPregnant: true,
           village: "Rampur",
           tola: "Harijan Tola",
-          asha: "Sunita Kumari (ASHA-001)",
+          ashaId: "ASHA-003",
+          asha: "Rekha Devi (ASHA-003)",
           weeks: 34,
           bp_sys: 165,
           bp_dia: 112,
@@ -2053,92 +2769,105 @@
           triage: "CRITICAL",
           rules: ["R1", "R2"],
           verification: "UNVERIFIED",
-          actionStatus: "PENDING",
+          dispatchLabel: null,
           turns: [
             {
               seq: 1,
-              stt: "Rampur Harijan Tola se Anita Devi, 34 hafte, BP 165 by 112 hai aur tez sar dard hai over",
+              timestamp: nowStr,
+              what_happened: "Worker: ASHA-003 · Anita Devi (34w) · BP 165/112 + Severe Headache -> Rules R1, R2 CRITICAL",
+              stt: "ASHA ID 003, Rampur Harijan Tola se Anita Devi, 34 hafte, BP 165 by 112 hai aur tez sar dard hai",
               stt_ms: 138,
-              llm_json: { gestational_weeks: 34, bp_systolic: 165, bp_diastolic: 112, symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT" }] },
+              llm_json: { asha_id: "ASHA-003", gestational_weeks: 34, bp_systolic: 165, bp_diastolic: 112, symptoms: [{ code: "SEVERE_HEADACHE", presence: "PRESENT" }] },
               llm_ms: 272,
               validation: "PASS · Soft warning: confirm severe BP (165/112)",
-              triage_decision: "CRITICAL — Rules R1, R2 fired (Provisional UNVERIFIED alert queued)",
-              tts_reply: "Kripya confirm karein: Anita Devi, 34 hafte, BP 1-6-5 by 1-1-2, tez sar dard. Kya yeh sahi hai?"
+              triage_decision: "CRITICAL — Rules R1, R2 fired",
+              tts_reply: "Kripya confirm karein: Anita Devi, 34 hafte, BP 165 by 112, tez sar dard. Kya yeh sahi hai?"
             }
           ]
         };
         visits.unshift(liveVisit);
-        openDrawer(newId);
+        updateStepperBar(liveVisit, "CONFIRM_VALUES");
         renderTable(newId);
-
-        setTimeout(() => {
-          lcdStatus.textContent = "TTS Readback...";
-          lcdDuplex.textContent = "MIC MUTED (Half-Duplex)";
-        }, 900);
 
         setTimeout(() => {
           liveVisit.verification = "VERIFIED";
           liveVisit.turns.push({
             seq: 2,
-            stt: "Haan sahi hai over",
+            timestamp: formatNowTimestamp(),
+            what_happened: "Confirmed via voice ('Haan sahi hai') -> Record VERIFIED",
+            stt: "Haan sahi hai",
             stt_ms: 92,
             llm_json: { confirmation: "YES" },
             llm_ms: 148,
             validation: "COMMITTED_VERIFIED",
             triage_decision: "CRITICAL [R1, R2] verified",
-            tts_reply: "Anita Devi ka record verify ho gaya. PHC ko CRITICAL alert bhej diya gaya hai."
+            tts_reply: "Anita Devi ka record verify ho gaya."
           });
-          lcdStatus.textContent = "Call Completed";
-          lcdDuplex.textContent = "MIC IDLE";
-          renderDrawerContent(liveVisit);
+          updateStepperBar(liveVisit, "COMMITTED_VERIFIED");
           renderTable(newId);
-        }, 2600);
-      } else if (kind === "anemia") {
-        lcdSub.innerHTML = "Speaking: 'Sarita Kumari, 26w, Hb 6.4... OVER'";
+        }, 2000);
+      } else if (kind === "nonpregnant") {
+        lcdSub.textContent = "Speaking: 'ASHA 005, Sarita Kumari, pregnant nahi hai, Hb 6.2...'";
         const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const nowStr = formatNowTimestamp();
         const liveVisit = {
           id: newId,
+          isLive: true,
+          recordedAt: nowStr,
+          whatHappened: "Worker: ASHA-005 · Non-Pregnant General Vitals · Hb 6.2 g/dL -> URGENT [R5a]",
           name: "Sarita Kumari",
           spouse: "Pappu Yadav",
-          age: 19,
-          village: "Rampur",
+          age: 34,
+          category: "GENERAL_VITALS",
+          isPregnant: false,
+          village: "Belwa",
           tola: "Nayi Basti",
-          asha: "Sunita Kumari (ASHA-001)",
-          weeks: 26,
+          ashaId: "ASHA-005",
+          asha: "Geeta Devi (ASHA-005)",
+          weeks: null,
           bp_sys: 118,
           bp_dia: 76,
-          hb: 6.4,
+          hb: 6.2,
           symptoms: [],
           triage: "URGENT",
           rules: ["R5a"],
           verification: "VERIFIED",
-          actionStatus: "PENDING",
+          dispatchLabel: null,
           turns: [
             {
               seq: 1,
-              stt: "Sarita Kumari Nayi Basti, 26 hafte, BP 118 by 76, hemoglobin 6 point 4 hai over",
+              timestamp: nowStr,
+              what_happened: "Worker: ASHA-005 · Sarita Kumari · Non-Pregnant General Vitals · BP 118/76, Hb 6.2 -> Rule R5a URGENT",
+              stt: "ASHA ID 005, Sarita Kumari, pregnant nahi hai, BP 118 by 76, hemoglobin 6 point 2 hai",
               stt_ms: 149,
-              llm_json: { gestational_weeks: 26, bp_systolic: 118, bp_diastolic: 76, hb_g_dl: 6.4 },
+              llm_json: { asha_id: "ASHA-005", is_pregnant: false, bp_systolic: 118, bp_diastolic: 76, hb_g_dl: 6.2 },
               llm_ms: 251,
               validation: "PASS",
               triage_decision: "URGENT — Rule R5a fired (Hb < 7.0 g/dL)",
-              tts_reply: "Kripya confirm karein: Sarita Kumari, Hb 6 point 4. Record verify ho gaya."
+              tts_reply: "Sarita Kumari, Non-Pregnant Checkup, Hb 6.2. Record verify ho gaya."
             }
           ]
         };
         visits.unshift(liveVisit);
-        openDrawer(newId);
+        updateStepperBar(liveVisit, "COMMITTED_VERIFIED");
         renderTable(newId);
       } else if (kind === "garbled") {
-        lcdSub.innerHTML = "Noisy clip: 'BP 310 by 95...' → Hard Limit Refusal";
+        lcdSub.textContent = "Noisy clip: 'BP 310 by 95...' -> Hard Limit Refusal";
         const newId = "v-" + Math.floor(Math.random() * 900 + 200);
+        const nowStr = formatNowTimestamp();
         const liveVisit = {
           id: newId,
+          isLive: true,
+          recordedAt: nowStr,
+          whatHappened: "REJECTED bp_systolic=310 (outside 60..260) -> Routed to REPEAT_VALUE",
           name: "Guddi Devi",
           spouse: "Raju Paswan",
           age: 31,
+          category: "MATERNAL_ANC",
+          isPregnant: true,
           village: "Belwa",
           tola: "Dakshin Tola",
+          ashaId: "ASHA-002",
           asha: "Meena Yadav (ASHA-002)",
           weeks: 30,
           bp_sys: null,
@@ -2148,22 +2877,24 @@
           triage: "ROUTINE",
           rules: [],
           verification: "UNVERIFIED",
-          actionStatus: "PENDING",
+          dispatchLabel: null,
           turns: [
             {
               seq: 1,
-              stt: "Guddi Devi, 30 hafte, BP 310 by 95 hai over",
+              timestamp: nowStr,
+              what_happened: "Validation ERROR: bp_systolic=310 cleared to null -> Asking ASHA to repeat BP",
+              stt: "Guddi Devi, 30 hafte, BP 310 by 95 hai",
               stt_ms: 164,
               llm_json: { gestational_weeks: 30, bp_systolic: 310, bp_diastolic: 95 },
               llm_ms: 240,
               validation: "REJECTED (ERROR: bp_systolic=310 outside hard range 60–260; cleared from record)",
-              triage_decision: "SAFE REFUSAL — Invalid BP never stored; routed to ask_repeat",
-              tts_reply: "Mujhe BP sahi sunai nahi diya (310 sambhav nahi hai). Kripya BP dobara batayein."
+              triage_decision: "SAFE REFUSAL — Invalid BP never stored; routed to REPEAT_VALUE",
+              tts_reply: "Didi, uper wala BP sahi sunai nahi diya. Kripya dobara batayein."
             }
           ]
         };
         visits.unshift(liveVisit);
-        openDrawer(newId);
+        updateStepperBar(liveVisit, "ASK_BP");
         renderTable(newId);
       }
     }
@@ -2182,7 +2913,7 @@
 
     window.addEventListener("mousemove", (e) => {
       if (!isDragging) return;
-      const pct = Math.min(82, Math.max(55, (e.clientX / window.innerWidth) * 100));
+      const pct = Math.min(82, Math.max(56, (e.clientX / window.innerWidth) * 100));
       phcPane.style.width = pct + "%";
     });
 
@@ -2194,10 +2925,7 @@
       document.body.style.userSelect = "";
     });
 
-    // Initial render with Pooja Devi drawer open so you can see both right away
     renderTable();
-    openDrawer("v-101");
   </script>
 </body>
 </html>
-

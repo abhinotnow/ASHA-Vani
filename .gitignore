@@ -16,6 +16,8 @@ wheels/
 # Local AI agent & Graphify tooling outputs
 .agents/
 .claude/
+.hallmark/
+skills-lock.json
 graphify-out/
 brag-output/
 brag-output-*/

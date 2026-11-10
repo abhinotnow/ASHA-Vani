@@ -1,1 +1,7 @@
 - maybe reach out to an actual doctor/some source online to verify if our schema is good? not super necessary for a demo but good to keep in mind.
+- check if the call is automatically ending cleanly after confirmation (`COMMITTED_VERIFIED` -> hangup / close `/ws/call` after final TTS completes).
+- check if the physical phone line (Exotel PSTN bridge) is actually working end-to-end.
+- full all-in-one call recording & in-app audio player (`.mp4` / `.webm` / `.wav`): mix live mic + Timbre TTS + DTMF into one continuous recording (`MediaStreamDestination` + `MediaRecorder` and `/api/recordings/{session_id}`) with a replay bar in the inspection sheet.
+- check if the call is automatically ending cleanly after confirmation (`COMMITTED_VERIFIED` -> hangup / close `/ws/call` after final TTS completes).
+- check if the physical phone line (Exotel PSTN bridge) is actually working end-to-end.
+- full all-in-one call recording & in-app audio player (`.mp4` / `.webm` / `.wav`): mix live mic + Timbre TTS + DTMF into one continuous recording (`MediaStreamDestination` + `MediaRecorder` and `/api/recordings/{session_id}`) with a replay bar in the inspection sheet.

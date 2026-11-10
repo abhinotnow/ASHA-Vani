@@ -335,4 +335,56 @@ def test_step_by_step_full_checklist_flow(monkeypatch) -> None:
     asyncio.run(_run_checklist())
 
 
+def test_non_pregnant_and_dtmf_keypad_flow(monkeypatch) -> None:
+    """Verify non-pregnant general checkups ('pregnant nahi hai') and DTMF keypad fallback ('005', '150*95', '1')."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    async def _run_non_pregnant() -> None:
+        runner = LangGraphTurnRunner(require_full_checklist=True)
+        session = CallSession("sess-np", turn_runner=runner)
+        await session.start()
+
+        # DTMF keypad '005' for ASHA ID
+        t1 = await session.process_utterance("005")
+        assert t1 is not None
+        assert t1.asha_id == "ASHA-005"
+        assert t1.next_action == "ASK_PATIENT_NAME"
+
+        # Patient & Spouse
+        await session.process_utterance("Belwa mein Kavita Devi ke ghar")
+        t3 = await session.process_utterance("Sanjay Mahto")
+        assert t3 is not None
+        assert t3.next_action == "ASK_WEEKS"
+
+        # Non-pregnant answer -> skips weeks and moves straight to ASK_BP!
+        t4 = await session.process_utterance("Pregnant nahi hai, general checkup hai")
+        assert t4 is not None
+        assert t4.is_pregnant is False
+        assert t4.visit_category == "GENERAL_VITALS"
+        assert t4.next_action == "ASK_BP"
+
+        # DTMF keypad '150*95' for BP 150/95 -> moves to ASK_HB
+        t5 = await session.process_utterance("150*95")
+        assert t5 is not None
+        assert t5.visit_values.bp_systolic == 150
+        assert t5.visit_values.bp_diastolic == 95
+        assert t5.next_action == "ASK_HB"
+
+        # Hb 6.5 -> moves to CONFIRM_VALUES with Non-Pregnant Checkup
+        t6 = await session.process_utterance("6.5")
+        assert t6 is not None
+        assert t6.visit_values.hb_g_dl == 6.5
+        assert t6.next_action == "CONFIRM_VALUES"
+        assert "Non-Pregnant Checkup" in t6.reply_text
+
+        # DTMF keypad '1' to confirm readback -> VERIFIED
+        t7 = await session.process_utterance("1")
+        assert t7 is not None
+        assert t7.is_confirmation_turn is True
+        assert t7.verification is VerificationStatus.VERIFIED
+
+    asyncio.run(_run_non_pregnant())
+
+
+
 

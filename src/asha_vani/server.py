@@ -9,11 +9,14 @@ Pipeline Inspector update in real time.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
+import json
 import logging
 import os
 from pathlib import Path
 from collections.abc import AsyncIterator
 from typing import Any
+import urllib.request
 import uuid
 
 from dotenv import load_dotenv
@@ -42,6 +45,8 @@ from asha_vani.voice.exotel import (
 load_dotenv()
 logger = logging.getLogger(__name__)
 _SIMULATOR_HTML_PATH = Path(__file__).resolve().parent / "voice" / "simulator.html"
+_SIMULATOR_FURROW_HTML_PATH = Path(__file__).resolve().parent / "voice" / "simulator_furrow.html"
+_SOLUTION_PITCH_HTML_PATH = Path(__file__).resolve().parents[2] / "docs" / "solution_pitch.html"
 
 # In-memory WAV cache so identical prompts (greeting, follow-ups, repeats) cost 0 extra Gnani credits
 _TTS_WAV_CACHE: dict[str, bytes] = {}
@@ -76,6 +81,9 @@ class WebSocketConsoleBroadcaster:
     async def emit(self, event: CallEvent) -> None:
         data = event.model_dump(mode="json")
         self.history.append(data)
+        await self.broadcast_raw(data)
+
+    async def broadcast_raw(self, data: dict[str, Any]) -> None:
         dead: list[WebSocket] = []
         for ws in list(self.clients):
             try:
@@ -88,6 +96,7 @@ class WebSocketConsoleBroadcaster:
 
 broadcaster = WebSocketConsoleBroadcaster()
 active_sessions: dict[str, CallSession] = {}
+dispatches_store: dict[str, dict[str, Any]] = {}
 supabase_sink: SupabaseEventSink | None = None
 if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
     try:
@@ -222,6 +231,106 @@ async def serve_simulator() -> HTMLResponse:
     if _SIMULATOR_HTML_PATH.exists():
         return HTMLResponse(_SIMULATOR_HTML_PATH.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>Simulator HTML not found in src/asha_vani/voice/simulator.html</h1>", status_code=404)
+
+
+@app.get("/furrow", response_class=HTMLResponse)
+@app.get("/simulator-furrow", response_class=HTMLResponse)
+async def serve_simulator_furrow() -> HTMLResponse:
+    """Serve the Hallmark Furrow edition of the ASHA-Vani Field Register & Nokia Simulator workspace."""
+    if _SIMULATOR_FURROW_HTML_PATH.exists():
+        return HTMLResponse(_SIMULATOR_FURROW_HTML_PATH.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        "<h1>Furrow Simulator HTML not found in src/asha_vani/voice/simulator_furrow.html</h1>",
+        status_code=404,
+    )
+
+
+@app.get("/pitch", response_class=HTMLResponse)
+async def serve_solution_pitch() -> HTMLResponse:
+    """Serve the 1-Page A4 Solution Pitch document."""
+    if _SOLUTION_PITCH_HTML_PATH.exists():
+        return HTMLResponse(_SOLUTION_PITCH_HTML_PATH.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Solution pitch HTML not found in docs/solution_pitch.html</h1>", status_code=404)
+
+
+class OfficerLoginRequest(BaseModel):
+    email: str = "dr.verma@asha-vani.in"
+    password: str = ""
+    mode: str = "demo"
+
+
+@app.post("/api/auth/login")
+async def officer_login(req: OfficerLoginRequest) -> dict[str, Any]:
+    """Authenticate Medical Officer via Supabase Auth REST API when configured, or issue Demo Officer session."""
+    base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    api_key = (
+        os.getenv("SUPABASE_ANON_KEY", "").strip()
+        or os.getenv("SUPABASE_KEY", "").strip()
+        or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    )
+
+    if req.mode != "demo" and base_url and api_key and req.password:
+        auth_url = f"{base_url}/auth/v1/token?grant_type=password"
+        payload = json.dumps({"email": req.email, "password": req.password}).encode("utf-8")
+        http_req = urllib.request.Request(
+            auth_url,
+            data=payload,
+            method="POST",
+            headers={
+                "apikey": api_key,
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(http_req, timeout=5.0) as resp:
+                auth_data = json.loads(resp.read().decode("utf-8"))
+                return {
+                    "ok": True,
+                    "provider": "supabase",
+                    "officer_name": req.email.split("@")[0].replace(".", " ").title(),
+                    "email": req.email,
+                    "role": "Medical Officer · Triage & Dispatch",
+                    "access_token": auth_data.get("access_token", ""),
+                }
+        except Exception as exc:
+            return {"ok": False, "error": f"Supabase Auth failed: {exc}"}
+
+    return {
+        "ok": True,
+        "provider": "supabase_demo" if supabase_sink is not None else "local_session",
+        "officer_name": "Dr. A. Verma",
+        "email": req.email or "dr.verma@asha-vani.in",
+        "role": "Medical Officer · Triage & Dispatch",
+    }
+
+
+class DispatchRequest(BaseModel):
+    visit_id: str
+    unit_type: str  # "108_UNIT" | "ANM_MOBILE" | "HOME_VISIT"
+    eta_minutes: int = 14
+    notes: str = ""
+
+
+@app.post("/api/dispatch")
+async def create_dispatch(req: DispatchRequest) -> dict[str, Any]:
+    """Record a Home Dispatch order for a visit and broadcast to all connected consoles."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    unit_labels = {
+        "108_UNIT": f"108 Unit · {req.eta_minutes}m ETA",
+        "ANM_MOBILE": f"ANM Mobile · {req.eta_minutes}m ETA",
+        "HOME_VISIT": "Home Follow-up Logged",
+    }
+    record = {
+        "visit_id": req.visit_id,
+        "unit_type": req.unit_type,
+        "label": unit_labels.get(req.unit_type, req.unit_type),
+        "eta_minutes": req.eta_minutes,
+        "dispatched_at": now_iso,
+        "notes": req.notes,
+    }
+    dispatches_store[req.visit_id] = record
+    await broadcaster.broadcast_raw({"event_type": "dispatch_updated", "payload": record})
+    return {"ok": True, "dispatch": record}
 
 
 class UtteranceRequest(BaseModel):
