@@ -20,7 +20,7 @@ import urllib.request
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
@@ -30,6 +30,9 @@ from asha_vani.voice.session import PCM16_BYTES_PER_SECOND, CallSession, build_p
 from asha_vani.voice.stt import GnaniPrismaSTT
 from asha_vani.voice.tts import FakeTTS, FixedScriptCache, GnaniTimbreTTS, TextToSpeech
 from asha_vani.voice.turn_runner import LangGraphTurnRunner
+from asha_vani.language.locale import DEFAULT_LANGUAGE, locale_meta, normalize_language_code
+from asha_vani.language.registry import WorkerRegistry, mask_phone
+from asha_vani.language.routing import CallLanguage, LanguageSource, resolve_call_language
 from asha_vani.persistence import SupabaseEventSink
 from asha_vani.voice.audio import FRAME_BYTES, condition_telephone_audio
 from asha_vani.voice.exotel import (
@@ -120,9 +123,14 @@ if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KE
 
         logging.getLogger(__name__).exception("Supabase persistence is disabled: %s", exc)
 
+worker_registry = WorkerRegistry(
+    supabase_client=supabase_sink._client if supabase_sink is not None else None,
+)
+
 shared_turn_runner = LangGraphTurnRunner(
     require_full_checklist=True,
     history_lookup=supabase_sink.find_patient_history if supabase_sink is not None else None,
+    registry=worker_registry,
 )
 
 
@@ -133,19 +141,36 @@ def _session_sinks() -> list[Any]:
     return sinks
 
 
+def _timbre_client_for_language(language: str = DEFAULT_LANGUAGE) -> GnaniTimbreTTS:
+    lang = normalize_language_code(language)
+    tts_cfg = locale_meta(lang).get("tts", {})
+    if lang == DEFAULT_LANGUAGE:
+        voice = os.getenv("GNANI_TTS_VOICE", str(tts_cfg.get("voice", "Poorvi")))
+        tts_lang = os.getenv("GNANI_TTS_LANG", str(tts_cfg.get("language", "auto")))
+    else:
+        voice = str(tts_cfg.get("voice", "Poorvi"))
+        tts_lang = str(tts_cfg.get("language", "hi-IN"))
+    return GnaniTimbreTTS(
+        api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+        voice=voice,
+        model=str(tts_cfg.get("model", "timbre-v2.5")),
+        language=tts_lang,
+        sample_rate=8000,
+        container="raw",
+    )
+
+
 class WebSocketTimbreStream:
     """Stream raw 8 kHz PCM from Timbre to the active browser call socket."""
 
-    def __init__(self, ws: WebSocket) -> None:
+    def __init__(self, ws: WebSocket, *, language: str = DEFAULT_LANGUAGE) -> None:
         self._ws = ws
-        self._client = GnaniTimbreTTS(
-            api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
-            voice=os.getenv("GNANI_TTS_VOICE", "Poorvi"),
-            model="timbre-v2.5",
-            language=os.getenv("GNANI_TTS_LANG", "auto"),
-            sample_rate=8000,
-            container="raw",
-        )
+        self._language = normalize_language_code(language)
+        self._client = _timbre_client_for_language(self._language)
+
+    def set_language(self, language: str) -> None:
+        self._language = normalize_language_code(language)
+        self._client = _timbre_client_for_language(self._language)
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
         if not os.getenv("GNANI_API_KEY", "").strip():
@@ -164,6 +189,7 @@ class WebSocketTimbreStream:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip()
+    evon_base_url = os.getenv("EVON_BASE_URL", "").strip()
     try:
         exotel_stream_url = build_exotel_stream_url(public_base_url) if public_base_url else None
     except ValueError:
@@ -171,6 +197,8 @@ async def health() -> dict[str, Any]:
     return {
         "ok": True,
         "gnani_configured": bool(os.getenv("GNANI_API_KEY", "").strip()),
+        "evon_configured": bool(evon_base_url),
+        "evon_model": (os.getenv("EVON_MODEL", "gnani/gnani-evon-v3.3-30B-A3B").strip() or "gnani/gnani-evon-v3.3-30B-A3B") if evon_base_url else None,
         "active_calls": len(active_sessions),
         "console_clients": len(broadcaster.clients),
         "supabase_configured": supabase_sink is not None,
@@ -200,17 +228,21 @@ def synthesize_tts_wav(
     text: str,
     voice: str | None = None,
     language: str | None = None,
+    locale_code: str | None = None,
 ) -> Response:
     """Synthesize a WAV audio clip using Gnani Timbre v2.5 (`GnaniTTSClient`) with in-memory caching."""
     api_key = os.getenv("GNANI_API_KEY", "").strip()
     if not api_key:
         return Response(content=b"", status_code=204)
 
-    # Default to Poorvi + auto for Roman Hinglish, or respect .env override
-    chosen_voice = voice or os.getenv("GNANI_TTS_VOICE", "Poorvi")
-    chosen_lang = language or os.getenv("GNANI_TTS_LANG", "auto")
-    # If .env has Nalini + hi-IN, Poorvi/auto handles Roman Hinglish much more naturally;
-    # keep user choice if explicitly set, and cache by (voice, lang, text)
+    loc = normalize_language_code(locale_code) if locale_code else DEFAULT_LANGUAGE
+    tts_cfg = locale_meta(loc).get("tts", {})
+    if locale_code and loc != DEFAULT_LANGUAGE:
+        chosen_voice = voice or str(tts_cfg.get("voice", "Poorvi"))
+        chosen_lang = language or str(tts_cfg.get("language", "hi-IN"))
+    else:
+        chosen_voice = voice or os.getenv("GNANI_TTS_VOICE", "Poorvi")
+        chosen_lang = language or os.getenv("GNANI_TTS_LANG", "auto")
     cache_key = f"{chosen_voice}:{chosen_lang}:{text.strip()}"
     if cache_key in _TTS_WAV_CACHE:
         return Response(content=_TTS_WAV_CACHE[cache_key], media_type="audio/wav")
@@ -243,6 +275,7 @@ async def serve_simulator() -> HTMLResponse:
 
 
 @app.get("/furrow", response_class=HTMLResponse)
+@app.get("/simulator/furrow", response_class=HTMLResponse)
 @app.get("/simulator-furrow", response_class=HTMLResponse)
 async def serve_simulator_furrow() -> HTMLResponse:
     """Serve the Hallmark Furrow edition of the ASHA-Vani Field Register & Nokia Simulator workspace."""
@@ -342,11 +375,73 @@ async def create_dispatch(req: DispatchRequest) -> dict[str, Any]:
     return {"ok": True, "dispatch": record}
 
 
+@app.get("/api/workers")
+async def list_workers() -> dict[str, Any]:
+    """Return registered ASHA workers with masked phone numbers for the simulator selector."""
+    items: list[dict[str, Any]] = []
+    for w in worker_registry.list_workers():
+        primary_phone = w.phones[0].phone if w.phones else None
+        items.append(
+            {
+                "asha_id": w.asha_id,
+                "full_name": w.full_name,
+                "language": w.language,
+                "state": w.state,
+                "district": w.district,
+                "phc": w.phc,
+                "phone_masked": mask_phone(primary_phone),
+                "sim_caller": primary_phone if w.is_simulated else None,
+                "is_simulated": w.is_simulated,
+            }
+        )
+    return {"workers": items}
+
+
+@app.get("/api/phone-links")
+async def get_pending_phone_links(
+    status: str = "PENDING",
+    x_officer_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    expected_token = os.getenv("PHC_OFFICER_TOKEN", "").strip()
+    if expected_token and x_officer_token != expected_token:
+        raise HTTPException(status_code=401, detail="Officer authentication required")
+    return {"links": worker_registry.list_pending_links(status=status)}
+
+
+@app.post("/api/phone-links/{link_id}/approve")
+async def approve_phone_link(
+    link_id: str,
+    x_officer_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    expected_token = os.getenv("PHC_OFFICER_TOKEN", "").strip()
+    if expected_token and x_officer_token != expected_token:
+        raise HTTPException(status_code=401, detail="Officer authentication required")
+    ok = worker_registry.approve_link(link_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Pending phone link not found")
+    return {"ok": True, "link_id": link_id, "status": "APPROVED"}
+
+
+@app.post("/api/phone-links/{link_id}/reject")
+async def reject_phone_link(
+    link_id: str,
+    x_officer_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    expected_token = os.getenv("PHC_OFFICER_TOKEN", "").strip()
+    if expected_token and x_officer_token != expected_token:
+        raise HTTPException(status_code=401, detail="Officer authentication required")
+    ok = worker_registry.reject_link(link_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Pending phone link not found")
+    return {"ok": True, "link_id": link_id, "status": "REJECTED"}
+
+
 class UtteranceRequest(BaseModel):
     session_id: str | None = None
     caller: str = "+919900000001"
     transcript: str
     stt_latency_ms: float = 120.0
+    language: str | None = None
 
 
 @app.post("/api/turn")
@@ -355,12 +450,19 @@ async def post_utterance_turn(req: UtteranceRequest) -> dict[str, Any]:
     sid = req.session_id or f"call-{uuid.uuid4().hex[:8]}"
     session = active_sessions.get(sid)
     if session is None:
+        call_lang = (
+            CallLanguage.from_code(req.language, source=LanguageSource.SWITCHED)
+            if req.language
+            else resolve_call_language(req.caller, worker_registry)
+        )
         session = CallSession(
             sid,
             caller=req.caller,
             turn_runner=shared_turn_runner,
             tts=FakeTTS(),
             sinks=_session_sinks(),
+            language=call_lang,
+            registry=worker_registry,
         )
         active_sessions[sid] = session
         await session.start()
@@ -403,11 +505,25 @@ async def get_call_recording(session_id: str) -> Response:
     """Serve the full all-in-one call recording for playback in the Inspection Sheet audio player."""
     stored = call_recordings_store.get(session_id)
     if stored is not None:
-        return Response(content=stored[0], media_type=stored[1])
+        return Response(
+            content=stored[0],
+            media_type=stored[1],
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Disposition": f'inline; filename="asha-vani-{session_id}.wav"',
+            },
+        )
 
     live_session = active_sessions.get(session_id)
     if live_session is not None and len(live_session.call_audio_pcm16) > 0:
-        return Response(content=live_session.build_call_wav(), media_type="audio/wav")
+        return Response(
+            content=live_session.build_call_wav(),
+            media_type="audio/wav",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Disposition": f'inline; filename="asha-vani-{session_id}.wav"',
+            },
+        )
 
     # Fallback: stitch cached TTS WAVs for sessions that ran in scripted/HTTP mode
     stitched_pcm = bytearray()
@@ -447,33 +563,57 @@ async def ws_console(ws: WebSocket) -> None:
 
 
 @app.websocket("/ws/call")
-async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+919900000001") -> None:
+async def ws_call(
+    ws: WebSocket,
+    session_id: str | None = None,
+    caller: str = "+919900000001",
+    worker_id: str | None = None,
+) -> None:
     """Accept 8 kHz PCM16 for Prisma plus JSON utterances for replay/manual mode."""
     await ws.accept()
     sid = session_id or f"call-{uuid.uuid4().hex[:8]}"
-    tts_stream = WebSocketTimbreStream(ws)
+    logger.info("New call WebSocket connection accepted: sid=%s, caller=%s", sid, caller)
+    if worker_id:
+        w = worker_registry.by_asha_id(worker_id)
+        call_lang = (
+            CallLanguage.from_code(w.language, source=LanguageSource.REGISTERED, worker=w, locked=True)
+            if w is not None
+            else resolve_call_language(caller, worker_registry)
+        )
+    else:
+        call_lang = resolve_call_language(caller, worker_registry)
+
+    tts_stream = WebSocketTimbreStream(ws, language=call_lang.effective_code)
     session = CallSession(
         sid,
         caller=caller,
         turn_runner=shared_turn_runner,
         tts=tts_stream,
         sinks=_session_sinks(),
+        language=call_lang,
+        registry=worker_registry,
         realtime_playback_hold=True,
     )
     active_sessions[sid] = session
     await session.start()
+    greeting_text = session.greeting_text()
     await ws.send_json(
         {
             "type": "call_started",
             "session_id": sid,
-            "greeting_text": INITIAL_GREETING_HINGLISH,
+            "greeting_text": greeting_text,
+            "language": session.language.effective_code,
+            "language_raw": session.language.code,
+            "language_source": session.language.source.value,
+            "asha_id": session.language.worker.asha_id if session.language.worker else None,
+            "asha_name": session.language.worker.display_name if session.language.worker else None,
         }
     )
     session.duplex_gate.start_speaking()
     greet_t0 = asyncio.get_running_loop().time()
     greet_bytes = 0
     try:
-        async for chunk in tts_stream.synthesize(INITIAL_GREETING_HINGLISH):
+        async for chunk in tts_stream.synthesize(greeting_text):
             session.record_speaker_audio(chunk)
             greet_bytes += len(chunk)
     finally:
@@ -497,8 +637,11 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                 break
 
     async def frames() -> AsyncIterator[bytes]:
-        while True:
-            frame = await audio_queue.get()
+        while not call_done.is_set() and not session.language_changed_event.is_set():
+            try:
+                frame = await asyncio.wait_for(audio_queue.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                continue
             if frame is None:
                 return
             if session.duplex_gate.is_mic_muted:
@@ -508,33 +651,49 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
     async def consume_prisma() -> None:
         nonlocal end_reason
         try:
-            prisma = GnaniPrismaSTT(
-                api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
-                language_code=os.getenv("GNANI_STT_LANGUAGE", "hi-IN"),
-                sample_rate=8000,
-                format="transcribe",
-            )
-            async for chunk in prisma.stream(frames()):
-                if session.duplex_gate.is_mic_muted:
-                    _drain_audio_queue()
-                    continue
-                turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
-                if turn is not None:
-                    _drain_audio_queue()
-                    await ws.send_json({
-                        "type": "turn_reply",
-                        "session_id": sid,
-                        "reply_text": turn.reply_text,
-                        "turn": turn.model_dump(mode="json"),
-                    })
-                    if turn.next_action == "END_CALL":
-                        end_reason = "COMPLETED"
-                        await ws.send_json({"type": "call_ended", "session_id": sid, "reason": "COMPLETED"})
-                        call_done.set()
-                        return
+            while not call_done.is_set():
+                session.language_changed_event.clear()
+                prisma = GnaniPrismaSTT(
+                    api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+                    language_code=session.language.bcp47,
+                    language_candidates=session.language.candidates if not session.language.locked else None,
+                    sample_rate=8000,
+                    format="transcribe",
+                )
+                async for chunk in prisma.stream(frames()):
+                    logger.info("Prisma STT chunk received: '%s' (is_final=%s)", chunk.text, chunk.is_final)
+                    if session.duplex_gate.is_mic_muted:
+                        _drain_audio_queue()
+                        continue
+                    prev_lang = session.language.effective_code
+                    turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
+                    if session.language.effective_code != prev_lang:
+                        await ws.send_json({
+                            "type": "language_changed",
+                            "session_id": sid,
+                            "language": session.language.effective_code,
+                            "language_source": session.language.source.value,
+                        })
+                    if turn is not None:
+                        _drain_audio_queue()
+                        _save_session_recording(session)
+                        await ws.send_json({
+                            "type": "turn_reply",
+                            "session_id": sid,
+                            "reply_text": turn.reply_text,
+                            "turn": turn.model_dump(mode="json"),
+                        })
+                        if turn.next_action == "END_CALL":
+                            end_reason = "COMPLETED"
+                            await ws.send_json({"type": "call_ended", "session_id": sid, "reason": "COMPLETED"})
+                            call_done.set()
+                            return
+                if not session.language_changed_event.is_set():
+                    break
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            logger.error("Prisma streaming error: %s", exc, exc_info=True)
             await ws.send_json({"type": "stt_error", "message": str(exc)[:200]})
 
     prisma_task = asyncio.create_task(consume_prisma())
@@ -558,6 +717,9 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                 if session.duplex_gate.is_mic_muted:
                     _drain_audio_queue()
                 raw_pcm = msg["bytes"]
+                if not hasattr(session, "_logged_first_pcm"):
+                    session._logged_first_pcm = True
+                    logger.info("Received first PCM mic audio packet from browser: len=%d bytes", len(raw_pcm))
                 if current_snr_db is not None and current_snr_db > 0 and len(raw_pcm) >= 4:
                     raw_pcm = condition_telephone_audio(raw_pcm, src_rate=8000, snr_db=current_snr_db)
                 # FrameBuffer yields exact 1,024-byte audio blocks for Prisma.
@@ -570,6 +732,26 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                         except asyncio.QueueEmpty:
                             pass
                     audio_queue.put_nowait(frame)
+
+                if session._vad_speech_ended:
+                    session._vad_speech_ended = False
+                    vad_turn = await session.flush_on_vad()
+                    if vad_turn is not None:
+                        _drain_audio_queue()
+                        _save_session_recording(session)
+                        await ws.send_json(
+                            {
+                                "type": "turn_reply",
+                                "session_id": sid,
+                                "reply_text": vad_turn.reply_text,
+                                "turn": vad_turn.model_dump(mode="json"),
+                            }
+                        )
+                        if vad_turn.next_action == "END_CALL":
+                            end_reason = "COMPLETED"
+                            await ws.send_json({"type": "call_ended", "session_id": sid, "reason": "COMPLETED"})
+                            call_done.set()
+                            break
             elif msg.get("text") is not None:
                 data = json.loads(msg["text"])
                 mtype = data.get("type")
@@ -583,6 +765,7 @@ async def ws_call(ws: WebSocket, session_id: str | None = None, caller: str = "+
                         stt_latency_ms=float(data.get("stt_latency_ms", 120.0)),
                     )
                     if out is not None:
+                        _save_session_recording(session)
                         await ws.send_json(
                             {
                                 "type": "turn_reply",
@@ -653,8 +836,11 @@ async def ws_exotel(ws: WebSocket) -> None:
     inbound_media_messages = 0
 
     async def frames() -> AsyncIterator[bytes]:
-        while True:
-            frame = await audio_queue.get()
+        while not call_done.is_set() and not (session and session.language_changed_event.is_set()):
+            try:
+                frame = await asyncio.wait_for(audio_queue.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                continue
             if frame is None:
                 return
             yield frame
@@ -662,19 +848,24 @@ async def ws_exotel(ws: WebSocket) -> None:
     async def process_prisma() -> None:
         assert session is not None
         try:
-            prisma = GnaniPrismaSTT(
-                api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
-                language_code=os.getenv("GNANI_STT_LANGUAGE", "hi-IN"),
-                sample_rate=8000,
-                format="transcribe",
-                realtime_pace=True,
-            )
-            async for chunk in prisma.stream(frames()):
-                turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
-                if turn is not None and turn.next_action == "END_CALL":
-                    # ExotelTTSStream waits for a playback mark before the turn returns.
-                    call_done.set()
-                    return
+            while not call_done.is_set():
+                session.language_changed_event.clear()
+                prisma = GnaniPrismaSTT(
+                    api_key=os.getenv("GNANI_API_KEY", "").strip() or None,
+                    language_code=session.language.bcp47,
+                    language_candidates=session.language.candidates if not session.language.locked else None,
+                    sample_rate=8000,
+                    format="transcribe",
+                    realtime_pace=True,
+                )
+                async for chunk in prisma.stream(frames()):
+                    turn = await session.receive_stt_chunk(chunk, stt_latency_ms=chunk.latency_ms)
+                    if turn is not None and turn.next_action == "END_CALL":
+                        # ExotelTTSStream waits for a playback mark before the turn returns.
+                        call_done.set()
+                        return
+                if not session.language_changed_event.is_set():
+                    break
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -690,7 +881,7 @@ async def ws_exotel(ws: WebSocket) -> None:
         session.eou_detector.clear()
         try:
             logger.info("Exotel greeting synthesis started")
-            async for chunk in tts.synthesize(INITIAL_GREETING_HINGLISH):
+            async for chunk in tts.synthesize(session.greeting_text()):
                 session.record_speaker_audio(chunk)
             logger.info("Exotel greeting synthesis and playback mark completed")
         except asyncio.CancelledError:
@@ -745,10 +936,11 @@ async def ws_exotel(ws: WebSocket) -> None:
                 call_sid = _exotel_start_value(start, "call_sid", "CallSid", "callSid") or stream_sid
                 caller = _exotel_start_value(start, "from", "From", "caller") or "UNKNOWN"
                 sid = f"exotel-{call_sid}"
-                tts = ExotelTTSStream(ws, stream_sid)
+                call_lang = resolve_call_language(caller, worker_registry)
+                tts = ExotelTTSStream(ws, stream_sid, language=call_lang.effective_code)
                 session = CallSession(
                     sid, caller=caller, source="EXOTEL", turn_runner=shared_turn_runner,
-                    tts=tts, sinks=_session_sinks(),
+                    tts=tts, sinks=_session_sinks(), language=call_lang, registry=worker_registry,
                 )
                 active_sessions[sid] = session
                 await session.start()
@@ -787,7 +979,9 @@ async def ws_exotel(ws: WebSocket) -> None:
                 end_reason = "COMPLETED" if call_done.is_set() else "DROPPED"
                 break
             elif event == "dtmf":
-                # DTMF is currently informational; voice is the supported input path.
+                digit = str((message.get("dtmf") or {}).get("digit") or "").strip()
+                if digit and session is not None:
+                    await session.process_utterance(digit)
                 continue
     except WebSocketDisconnect:
         logger.info("Exotel AgentStream WebSocket disconnected")

@@ -9,8 +9,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+import logging
 import re
 from typing import Protocol
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PAUSE_TIMEOUT_S: float = 1.2
 
@@ -41,20 +44,28 @@ class STTChunk:
     is_final: bool = False
     latency_ms: float = 0.0
     segment_id: str | None = None
+    detected_language_code: str | None = None
 
 
 class EndOfUtteranceDetector:
-    """Accumulates STT chunks and yields complete, cleaned utterances on 'over' or pause/final."""
+    """Accumulates STT chunks and yields complete, cleaned utterances on 'over' or VAD speech_end."""
 
     def __init__(self, pause_timeout_s: float = DEFAULT_PAUSE_TIMEOUT_S) -> None:
         self.pause_timeout_s = pause_timeout_s
         self._final_segments: list[str] = []
         self._latest_partial: str = ""
 
+    @property
+    def has_pending_speech(self) -> bool:
+        """True if there is buffered partial or final speech waiting for VAD end."""
+        return bool(self._latest_partial or self._final_segments)
+
     def feed(self, chunk: STTChunk) -> str | None:
         """Feed a partial or final STT chunk. Returns a completed utterance string or None."""
         text = chunk.text.strip()
         if not text:
+            if chunk.is_final and self.has_pending_speech:
+                return self.flush()
             return None
 
         cleaned, has_over = strip_trailing_over(text)
@@ -64,11 +75,11 @@ class EndOfUtteranceDetector:
 
         if chunk.is_final:
             self._latest_partial = ""
-            self._final_segments.append(text)
+            self._final_segments.append(cleaned)
             return self.flush()
 
-        # Partial transcript without "over": replace latest partial preview, wait for final/pause
-        self._latest_partial = text
+        # Partial transcript without "over": buffer partial preview, wait for VAD speech_end
+        self._latest_partial = cleaned
         return None
 
     def flush(self) -> str | None:
@@ -128,19 +139,23 @@ class GnaniPrismaSTT:
         *,
         api_key: str | None = None,
         language_code: str = "hi-IN",
+        language_candidates: list[str] | None = None,
         sample_rate: int = 8000,
         format: str = "transcribe",
         itn_native_numerals: bool = False,
         base_url: str = "https://api.vachana.ai",
         realtime_pace: bool = False,
+        model: str | None = None,
     ) -> None:
         self.api_key = api_key
         self.language_code = language_code
+        self.language_candidates = language_candidates
         self.sample_rate = sample_rate
         self.format = format
         self.itn_native_numerals = itn_native_numerals
         self.base_url = base_url
         self.realtime_pace = realtime_pace
+        self.model = model
 
     async def stream(self, frames: AsyncIterator[bytes]) -> AsyncIterator[STTChunk]:
         """Stream 1024-byte PCM16 frames to Gnani Prisma and yield `STTChunk` events."""
@@ -148,8 +163,13 @@ class GnaniPrismaSTT:
         from gnani.stt import (
             GnaniSTTStreamClient,
             StreamErrorEvent,
+            StreamProcessingEvent,
             StreamTranscriptEvent,
         )
+
+        resolved_model = self.model
+        if not resolved_model and (self.language_code == "indic-auto" or bool(self.language_candidates)):
+            resolved_model = "prisma-v3.0"
 
         kwargs: dict[str, object] = {
             "language_code": self.language_code,
@@ -158,6 +178,10 @@ class GnaniPrismaSTT:
             "itn_native_numerals": self.itn_native_numerals,
             "base_url": self.base_url,
         }
+        if resolved_model:
+            kwargs["model"] = resolved_model
+        if self.language_candidates:
+            kwargs["language_candidates"] = list(self.language_candidates)
         if self.api_key:
             kwargs["api_key"] = self.api_key
 
@@ -181,16 +205,40 @@ class GnaniPrismaSTT:
                 try:
                     async for event in client:
                         if isinstance(event, StreamTranscriptEvent):
+                            cleaned, has_over = strip_trailing_over(event.text)
+                            raw = getattr(event, "raw", {}) or {}
+                            is_final = bool(has_over or raw.get("is_final") or raw.get("final"))
+                            logger.info(
+                                "Prisma STT transcript: '%s' (is_final=%s, lang=%s)",
+                                event.text,
+                                is_final,
+                                getattr(event, "detected_language_code", None),
+                            )
                             await queue.put(
                                 STTChunk(
                                     text=event.text,
-                                    is_final=True,
+                                    is_final=is_final,
                                     latency_ms=float(getattr(event, "latency", 0) or 0.0),
                                     segment_id=getattr(event, "segment_id", None),
+                                    detected_language_code=getattr(event, "detected_language_code", None),
                                 )
                             )
+                        elif isinstance(event, StreamProcessingEvent):
+                            raw = getattr(event, "raw", {}) or {}
+                            msg_type = raw.get("type", "")
+                            if msg_type in ("speech_end", "vad_end"):
+                                logger.info("Prisma VAD: %s received -> user finished speaking", msg_type)
+                                await queue.put(
+                                    STTChunk(
+                                        text="",
+                                        is_final=True,
+                                    )
+                                )
                         elif isinstance(event, StreamErrorEvent):
-                            # Surface error message in logs without crashing the call loop
+                            logger.error(
+                                "Gnani Prisma StreamErrorEvent: %s",
+                                getattr(event, "message", str(event)),
+                            )
                             break
                 finally:
                     await queue.put(None)

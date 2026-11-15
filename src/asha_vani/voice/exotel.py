@@ -102,11 +102,16 @@ class ExotelMediaChunker:
 class ExotelTTSStream:
     """Adapt Timbre raw PCM to Exotel media packets and wait for playback marks."""
 
-    def __init__(self, websocket: Any, stream_sid: str) -> None:
+    def __init__(self, websocket: Any, stream_sid: str, *, language: str = "hi") -> None:
         self.websocket = websocket
         self.chunker = ExotelMediaChunker(stream_sid)
         self._marks: dict[str, asyncio.Future[None]] = {}
         self._mark_seq = 0
+        self._tts = None
+        self._language = language
+
+    def set_language(self, language: str) -> None:
+        self._language = language
         self._tts = None
 
     def acknowledge_mark(self, message: dict[str, Any]) -> None:
@@ -116,16 +121,21 @@ class ExotelTTSStream:
             future.set_result(None)
 
     async def synthesize(self, text: str):
+        from asha_vani.language.locale import DEFAULT_LANGUAGE, locale_meta, normalize_language_code
         from asha_vani.voice.tts import GnaniTimbreTTS
 
         if not os.getenv("GNANI_API_KEY", "").strip():
             raise RuntimeError("Gnani TTS is not configured")
         if self._tts is None:
+            lang = normalize_language_code(self._language)
+            tts_cfg = locale_meta(lang).get("tts", {})
+            voice = os.getenv("GNANI_TTS_VOICE", tts_cfg.get("voice", "Poorvi")) if lang == DEFAULT_LANGUAGE else tts_cfg.get("voice", "Poorvi")
+            tts_lang = os.getenv("GNANI_TTS_LANG", tts_cfg.get("language", "auto")) if lang == DEFAULT_LANGUAGE else tts_cfg.get("language", "hi-IN")
             self._tts = GnaniTimbreTTS(
                 api_key=os.getenv("GNANI_API_KEY", "").strip(),
-                voice=os.getenv("GNANI_TTS_VOICE", "Poorvi"),
-                model="timbre-v2.5",
-                language=os.getenv("GNANI_TTS_LANG", "auto"),
+                voice=voice,
+                model=str(tts_cfg.get("model", "timbre-v2.5")),
+                language=tts_lang,
                 sample_rate=8000,
                 container="raw",
             )

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 from typing import Any
+import unicodedata
 
+import httpx
 from pydantic import Field
 
+from asha_vani.language.locale import DEFAULT_LANGUAGE, lexicon, locale_meta, normalize_language_code
 from asha_vani.schemas import (
     ConfirmationIntent,
     ExtractedVisit,
@@ -209,11 +213,26 @@ def _transliterate_devanagari_word(word: str) -> str:
     return "".join(out)
 
 
+def _transliterate_indic_block(text: str, scheme: str) -> str:
+    try:
+        from indic_transliteration import sanscript
+
+        src = sanscript.TAMIL if scheme == "tamil" else sanscript.TELUGU
+        roman = sanscript.transliterate(text, src, sanscript.ITRANS)
+        ascii_text = unicodedata.normalize("NFKD", roman).encode("ascii", "ignore").decode("ascii")
+        return ascii_text.lower()
+    except Exception:
+        return text
+
+
 def transliterate_to_english(text: str) -> str:
-    """Convert any Devanagari words in `text` to Roman English equivalents."""
+    """Convert Devanagari, Tamil, or Telugu script in `text` to Roman English equivalents."""
     if not text:
         return ""
-    return re.sub(r"[\u0900-\u097f]+", lambda m: _transliterate_devanagari_word(m.group(0)), text)
+    out = re.sub(r"[\u0900-\u097f]+", lambda m: _transliterate_devanagari_word(m.group(0)), text)
+    out = re.sub(r"[\u0b80-\u0bff]+", lambda m: _transliterate_indic_block(m.group(0), "tamil"), out)
+    out = re.sub(r"[\u0c00-\u0c7f]+", lambda m: _transliterate_indic_block(m.group(0), "telugu"), out)
+    return out
 
 
 def _clean_person_name(raw_name: str | None) -> str | None:
@@ -232,51 +251,230 @@ def _clean_person_name(raw_name: str | None) -> str | None:
     return cleaned if 2 <= len(cleaned) <= 45 else None
 
 
+_AADHAAR_RE = re.compile(r"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}(?!\d)")
+_PHONE_RE = re.compile(r"(?<!\d)(?:(?:\+91|0)[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)")
+
+_PATIENT_FIELDS = frozenset({"full_name", "spouse_or_guardian_name", "age_years", "village", "tola"})
+_VISIT_FIELDS = frozenset({"gestational_weeks", "bp_systolic", "bp_diastolic", "hb_g_dl", "symptoms"})
+_VALID_SYMPTOM_CODES = frozenset(code.value for code in SymptomCode)
+_VALID_PRESENCE = frozenset(presence.value for presence in Presence)
+_VALID_CONFIRMATION = frozenset(intent.value for intent in ConfirmationIntent)
+
+_EVON_JSON_SCHEMA_PROMPT = (
+    "\nReturn ONLY a single valid JSON object (no markdown, no explanation) with exact top-level keys:\n"
+    '{"patient": {"full_name": string|null, "spouse_or_guardian_name": string|null, '
+    '"age_years": int|null, "village": string|null, "tola": string|null}, '
+    '"visit": {"gestational_weeks": int|null, "bp_systolic": int|null, "bp_diastolic": int|null, '
+    '"hb_g_dl": float|null, "symptoms": [{"code": SymptomCode, "presence": "PRESENT"|"ABSENT"|"UNKNOWN", '
+    '"phrase": string|null}]}, "confirmation_intent": "YES"|"NO"|"UNCLEAR"}.\n'
+    f"Allowed SymptomCode values: {', '.join(code.value for code in SymptomCode)}."
+)
+
+
+def redact_pii(text: str) -> str:
+    """Mask 12-digit Aadhaar and 10-digit Indian mobile numbers before external LLM calls."""
+    if not text:
+        return ""
+    redacted = _AADHAAR_RE.sub("[REDACTED_AADHAAR]", text)
+    return _PHONE_RE.sub("[REDACTED_PHONE]", redacted)
+
+
 class _ModelOutput(ProjectModel):
     patient: PatientReference = Field(default_factory=PatientReference)
     visit: ExtractedVisit = Field(default_factory=ExtractedVisit)
     confirmation_intent: ConfirmationIntent = ConfirmationIntent.UNCLEAR
 
 
-def _normalize_numbers(text: str) -> str:
+def _parse_evon_output(raw_text: str) -> _ModelOutput:
+    """Strip reasoning tags/fences, prune unknown keys, and validate into `_ModelOutput`."""
+    cleaned_text = re.sub(r"<think>.*?</think>", "", raw_text or "", flags=re.S | re.I).strip()
+    cleaned_text = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned_text, flags=re.I).strip()
+    start = cleaned_text.find("{")
+    end = cleaned_text.rfind("}")
+    if start != -1 and end > start:
+        cleaned_text = cleaned_text[start:end + 1]
+    payload = json.loads(cleaned_text)
+    if not isinstance(payload, dict):
+        raise ValueError("Evon output must be a JSON object")
+
+    raw_patient = payload.get("patient")
+    patient_dict: dict[str, Any] = {}
+    if isinstance(raw_patient, dict):
+        for key in _PATIENT_FIELDS:
+            if key in raw_patient:
+                val = raw_patient[key]
+                patient_dict[key] = None if (key == "age_years" and val == "") else val
+
+    raw_visit = payload.get("visit")
+    visit_dict: dict[str, Any] = {}
+    if isinstance(raw_visit, dict):
+        for key in _VISIT_FIELDS - {"symptoms"}:
+            if key in raw_visit:
+                val = raw_visit[key]
+                visit_dict[key] = None if val == "" else val
+        raw_symptoms = raw_visit.get("symptoms")
+        if isinstance(raw_symptoms, list):
+            clean_symptoms: list[dict[str, Any]] = []
+            for item in raw_symptoms:
+                if not isinstance(item, dict):
+                    continue
+                raw_code = item.get("code")
+                code_val = raw_code.strip().upper() if isinstance(raw_code, str) else ""
+                if code_val not in _VALID_SYMPTOM_CODES:
+                    continue
+                raw_presence = item.get("presence")
+                if raw_presence is None or (isinstance(raw_presence, str) and not raw_presence.strip()):
+                    presence_val = Presence.PRESENT.value
+                elif isinstance(raw_presence, str):
+                    presence_val = raw_presence.strip().upper()
+                else:
+                    continue
+                if presence_val not in _VALID_PRESENCE:
+                    continue
+                entry: dict[str, Any] = {"code": code_val, "presence": presence_val}
+                if "phrase" in item and (item["phrase"] is None or isinstance(item["phrase"], str)):
+                    entry["phrase"] = item["phrase"]
+                clean_symptoms.append(entry)
+            visit_dict["symptoms"] = clean_symptoms
+
+    raw_ci = payload.get("confirmation_intent")
+    ci_val = raw_ci.strip().upper() if isinstance(raw_ci, str) else ""
+    confirmation_val = ci_val if ci_val in _VALID_CONFIRMATION else ConfirmationIntent.UNCLEAR.value
+
+    return _ModelOutput.model_validate(
+        {
+            "patient": patient_dict,
+            "visit": visit_dict,
+            "confirmation_intent": confirmation_val,
+        }
+    )
+
+
+class _EvonStructuredModel:
+    """OpenAI-compatible async adapter for Gnani Evon v3.3 with thinking disabled."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str = "EMPTY",
+        model: str = "gnani/gnani-evon-v3.3-30B-A3B",
+        timeout_s: float = 8.0,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key or "EMPTY"
+        self.model = model
+        self.timeout_s = timeout_s
+
+    async def ainvoke(self, messages: list[tuple[str, str]]) -> _ModelOutput:
+        oai_messages: list[dict[str, str]] = []
+        for role, content in messages:
+            oai_role = "user" if role == "human" else role
+            if oai_role == "system":
+                content = f"{content}\n{_EVON_JSON_SCHEMA_PROMPT}"
+            oai_messages.append({"role": oai_role, "content": content})
+
+        request_payload = {
+            "model": self.model,
+            "messages": oai_messages,
+            "temperature": 0.0,
+            "max_tokens": 384,
+            "response_format": {"type": "json_object"},
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                json=request_payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+        content = str(data["choices"][0]["message"]["content"])
+        return _parse_evon_output(content)
+
+
+def _merged_lexicon_list(lang: str, key: str) -> list[str]:
+    items = list(lexicon(lang).get(key, []))
+    if lang != DEFAULT_LANGUAGE:
+        items.extend(lexicon(DEFAULT_LANGUAGE).get(key, []))
+    return list(dict.fromkeys(items))
+
+
+def _merged_symptom_terms(lang: str) -> dict[SymptomCode, list[str]]:
+    primary = lexicon(lang).get("symptoms", {})
+    fallback = lexicon(DEFAULT_LANGUAGE).get("symptoms", {}) if lang != DEFAULT_LANGUAGE else {}
+    out: dict[SymptomCode, list[str]] = {}
+    for code in SymptomCode:
+        terms = list(primary.get(code.value, []))
+        terms.extend(fallback.get(code.value, []))
+        out[code] = list(dict.fromkeys(terms))
+    return out
+
+
+def _normalize_numbers(text: str, language: str = DEFAULT_LANGUAGE) -> str:
     result = text.lower()
-    for phrase, digits in sorted(_NUMBER_PHRASES, key=lambda pair: -len(pair[0])):
+    merged: dict[str, str] = {}
+    if language != DEFAULT_LANGUAGE:
+        merged.update(lexicon(DEFAULT_LANGUAGE).get("numbers", {}))
+    merged.update(lexicon(language).get("numbers", {}))
+    for phrase, digits in sorted(merged.items(), key=lambda pair: -len(pair[0])):
         result = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", digits, result)
-    return re.sub(r"(\d+)\s*(?:point|dot|dashamlav)\s*(\d+)", r"\1.\2", result)
+    return re.sub(r"(\d+)\s*(?:point|dot|dashamlav|pulli)\s*(\d+)", r"\1.\2", result)
 
 
-def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtraction:
+def _fallback_extract(
+    transcript: str,
+    expected_action: str | None,
+    *,
+    language: str = DEFAULT_LANGUAGE,
+) -> TurnExtraction:
     """Conservative local extraction for outages and development without API keys."""
-    normalized = _normalize_numbers(transcript)
+    lang = normalize_language_code(language)
+    normalized = _normalize_numbers(transcript, lang)
     visit_data: dict[str, Any] = {}
     patient = PatientReference()
 
-    bp = re.search(r"(?:bp|blood pressure|बीपी)?\s*(\d{2,3})\s*(?:/|by|bai|over|बाई|बाय|और)\s*(\d{2,3})", normalized)
+    bp = re.search(r"(?:bp|blood pressure|बीपी|பிபி|బీపీ)?\s*(\d{2,3})\s*(?:/|by|bai|over|बाई|बाय|और|பாய்|బై)\s*(\d{2,3})", normalized)
     if bp:
         visit_data.update(bp_systolic=int(bp.group(1)), bp_diastolic=int(bp.group(2)))
-    weeks = re.search(r"(\d{1,2})\s*(?:weeks?|hafte|hafta|saptah|हफ्ते|हफ़्ते|सप्ताह)", normalized)
+    weeks = re.search(r"(\d{1,2})\s*(?:weeks?|hafte|hafta|saptah|vaaram|varam|varalu|हफ्ते|हफ़्ते|सप्ताह|வாரம்|వారాలు|వారం)", normalized)
     if weeks and int(weeks.group(1)) > 0:
         visit_data["gestational_weeks"] = int(weeks.group(1))
-    hb = re.search(r"(?:\bhb\b|hemoglobin|haemoglobin|हीमोग्लोबिन|एचबी)\s*(?:hai|is|है)?\s*(\d{1,2}(?:\.\d+)?)", normalized)
+    hb = re.search(r"(?:\bhb\b|hemoglobin|haemoglobin|हीमोग्लोबिन|एचबी|ஹீமோகுளோபின்|హీమోగ్లోబిన్)\s*(?:hai|is|है|உள்ளது|ఉంది)?\s*(\d{1,2}(?:\.\d+)?)", normalized)
     if hb:
         visit_data["hb_g_dl"] = float(hb.group(1))
 
+    neg_words = _merged_lexicon_list(lang, "negation_words") or ["nahi", "nahin", "no", "not"]
+    neg_alt = "|".join(re.escape(w) for w in neg_words)
     symptoms: list[SymptomReport] = []
-    for code, terms in _SYMPTOM_TERMS.items():
+    for code, terms in _merged_symptom_terms(lang).items():
         found = next((term for term in terms if term in normalized), None)
         if found:
             start = normalized.find(found)
             prefix = normalized[max(0, start - 18):start]
             suffix = normalized[start + len(found):start + len(found) + 20]
             negated = bool(
-                re.search(r"(?:nahi|nahin|no|not|नहीं)\s*$", prefix)
-                or re.match(r"\s*(?:nahi|nahin|no|not|नहीं)(?:\s|$)", suffix)
+                re.search(rf"(?:{neg_alt})\s*$", prefix)
+                or re.match(rf"\s*(?:{neg_alt})(?:\s|$)", suffix)
             )
             symptoms.append(SymptomReport(code=code, presence=Presence.ABSENT if negated else Presence.PRESENT, phrase=found))
+
+    yes_terms = _merged_lexicon_list(lang, "yes")
+    no_terms = _merged_lexicon_list(lang, "no")
+    yes_re = re.compile("|".join(rf"\b{re.escape(w)}\b" if w.isascii() else re.escape(w) for w in yes_terms), re.I)
+    no_re = re.compile("|".join(rf"\b{re.escape(w)}\b" if w.isascii() else re.escape(w) for w in no_terms), re.I)
+
+    denial_terms = _merged_lexicon_list(lang, "general_denial")
+    denial_re = re.compile("|".join(re.escape(w) for w in denial_terms), re.I) if denial_terms else re.compile(r"(?!)")
     # A clear general denial records known symptoms as absent, never as present.
     general_denial = bool(
-        re.search(r"\b(no symptoms|koi takleef nahi|koi lakshan nahi|kuch nahi|koi dikkat nahi)\b|कोई तकलीफ नहीं|कोई लक्षण नहीं|कुछ नहीं", normalized)
-        or (expected_action == "ASK_SYMPTOMS" and _NO_RE.search(transcript) and not _YES_RE.search(transcript))
+        denial_re.search(normalized)
+        or (expected_action == "ASK_SYMPTOMS" and no_re.search(transcript) and not yes_re.search(transcript))
     )
     if not symptoms and general_denial:
         symptoms = [SymptomReport(code=code, presence=Presence.ABSENT) for code in SymptomCode]
@@ -286,12 +484,17 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
     roman_transcript = transliterate_to_english(transcript)
     transcript_for_patient = roman_transcript
 
+    kw_spouse = list(dict.fromkeys([*lexicon(lang).get("keywords", {}).get("spouse", []), *lexicon(DEFAULT_LANGUAGE).get("keywords", {}).get("spouse", [])]))
+    kw_patient = list(dict.fromkeys([*lexicon(lang).get("keywords", {}).get("patient", []), *lexicon(DEFAULT_LANGUAGE).get("keywords", {}).get("patient", [])]))
+    spouse_alt = "|".join(re.escape(w) for w in kw_spouse if w.isascii()) or "pati|husband|spouse"
+    patient_alt = "|".join(re.escape(w) for w in kw_patient if w.isascii()) or "marij|patient|mahila|aurat"
+
     # Extract explicit spouse/husband name clauses (skipping clauses like 'pati ka naam galat hai')
     _name_stop_lookahead = (
-        r"(?=\s+(?:\d|\b(?:hai|hain|aur|age|umra|weeks?|hafte|hafta|saptah|bp|hb|hemoglobin|gaon|tola|pati|patni|marij|patient)\b)|[.,;!?]|$)"
+        r"(?=\s+(?:\d|\b(?:hai|hain|aur|age|umra|weeks?|hafte|hafta|saptah|vaaram|varam|bp|hb|hemoglobin|gaon|oor|ooru|pati|patni|marij|patient)\b)|[.,;!?]|$)"
     )
     for spouse_match in re.finditer(
-        r"\b(?:patni|pati(?:\s+ka\s+naam)?|husband(?:\s+name)?|spouse|w/o|wife\s+of|guardian)\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){0,4}?)"
+        rf"\b(?:patni|{spouse_alt}|w/o|wife\s+of|guardian)\b(?:\s+ka\s+naam|\s+name|\s+peru|\s+peyar)?\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){{0,4}}?)"
         + _name_stop_lookahead,
         roman_transcript,
         re.I,
@@ -303,7 +506,7 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
 
     # Extract explicit patient/wife name clauses (e.g. 'marij ka naam Sunita Devi hai')
     for pat_match in re.finditer(
-        r"\b(?:marij(?:\s+ka\s+naam)?|patient(?:\s+name|\s+ka\s+naam)?|mahila(?:\s+ka\s+naam)?|aurat(?:\s+ka\s+naam)?)\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){0,4}?)"
+        rf"\b(?:{patient_alt})\b(?:\s+ka\s+naam|\s+name|\s+peru|\s+peyar)?\s*(?:is|hai|:)?\s*([A-Za-z]+(?:\s+[A-Za-z]+){{0,4}}?)"
         + _name_stop_lookahead,
         transcript_for_patient,
         re.I,
@@ -312,12 +515,12 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
         if cleaned_pat:
             patient.full_name = cleaned_pat
 
-    mentions_patient_keyword = bool(re.search(r"\b(marij|patient|mahila|aurat)\b", roman_transcript, re.I))
+    mentions_patient_keyword = bool(re.search(rf"\b(?:{patient_alt})\b", roman_transcript, re.I))
     is_spouse_only_turn = expected_action == "ASK_SPOUSE_NAME" and not mentions_patient_keyword
 
     if not is_spouse_only_turn and patient.full_name is None:
         name = re.search(
-            r"\b([A-Za-z]+\s+(?:devi|kumari|bai|begum|yadav|verma|sharma|singh|khatoon))\b",
+            r"\b([A-Za-z]+\s+(?:devi|kumari|bai|begum|yadav|verma|sharma|singh|khatoon|murugan|reddy|rao|sundaram))\b",
             transcript_for_patient,
             re.I,
         )
@@ -326,7 +529,14 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
             if cleaned_pat and cleaned_pat != patient.spouse_or_guardian_name:
                 patient.full_name = cleaned_pat
 
-    for token, canonical in (("rampur", "Rampur"), ("रामपुर", "Rampur"), ("belwa", "Belwa"), ("बेलवा", "Belwa")):
+    for token, canonical in (
+        ("rampur", "Rampur"), ("रामपुर", "Rampur"),
+        ("belwa", "Belwa"), ("बेलवा", "Belwa"),
+        ("madurai", "Madurai"), ("மதுரை", "Madurai"),
+        ("melur", "Melur"), ("மேலூர்", "Melur"),
+        ("guntur", "Guntur"), ("గుంటూరు", "Guntur"),
+        ("tenali", "Tenali"), ("తెనాలి", "Tenali"),
+    ):
         if token in normalized or token in roman_transcript.lower():
             patient.village = canonical
             break
@@ -338,7 +548,7 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
         if token in normalized or token in roman_transcript.lower():
             patient.tola = canonical
             break
-    age = re.search(r"\b(?:age|umra)\s*(\d{2})\b|\b(\d{2})\s*(?:saal|years|साल)\b", normalized)
+    age = re.search(r"\b(?:age|umra|vayasu)\s*(\d{2})\b|\b(\d{2})\s*(?:saal|years|साल)\b", normalized)
     if age:
         patient.age_years = int(age.group(1) or age.group(2))
 
@@ -365,53 +575,87 @@ def _fallback_extract(transcript: str, expected_action: str | None) -> TurnExtra
         "CONFIRM_VALUES", "ASK_ANOTHER_PATIENT", "CONFIRM_PATIENT_MATCH",
         "ASK_READ_PRIOR_RECORD",
     } and not has_values:
-        if _YES_RE.search(transcript):
+        if yes_re.search(transcript):
             confirmation = ConfirmationIntent.YES
-        elif _NO_RE.search(transcript):
+        elif no_re.search(transcript):
             confirmation = ConfirmationIntent.NO
     return TurnExtraction(patient=patient, visit=ExtractedVisit.model_validate(visit_data), confirmation_intent=confirmation)
+
+
+def _build_language_prompt_addon(language: str) -> str:
+    lang = normalize_language_code(language)
+    if lang == DEFAULT_LANGUAGE:
+        return ""
+    meta = locale_meta(lang)
+    lang_name = meta.get("name_en", lang)
+    sym_map = lexicon(lang).get("symptoms", {})
+    hints = "; ".join(f"{code}: {', '.join(terms[:4])}" for code, terms in sym_map.items() if terms)
+    return (
+        f"\nActive caller language: {lang_name}. The utterance may be in {lang_name} native script, "
+        f"Romanized {lang_name} (e.g. Tanglish/Telglish), or code-mixed with English. "
+        f"Transliterate all patient/spouse/village names into English Roman Title Case. "
+        f"Local symptom terms -> schema codes: {hints}."
+    )
 
 
 async def extract_turn(
     transcript: str,
     expected_action: str | None = None,
     *,
+    language: str = DEFAULT_LANGUAGE,
     llm: Any | None = None,
 ) -> TurnExtraction:
-    """Extract one utterance asynchronously; fall back safely if Groq is unavailable."""
-    fallback = _fallback_extract(transcript, expected_action)
+    """Extract one utterance asynchronously; try Evon v3.3 -> Groq -> local regex fallback."""
+    lang = normalize_language_code(language)
+    fallback = _fallback_extract(transcript, expected_action, language=lang)
     models: list[Any] = []
     if llm is None:
+        evon_base_url = os.getenv("EVON_BASE_URL", "").strip()
+        if evon_base_url:
+            try:
+                timeout_s = float(os.getenv("EVON_TIMEOUT_S", "8.0").strip() or "8.0")
+            except ValueError:
+                timeout_s = 8.0
+            models.append(
+                _EvonStructuredModel(
+                    base_url=evon_base_url,
+                    api_key=os.getenv("EVON_API_KEY", "EMPTY").strip() or "EMPTY",
+                    model=os.getenv("EVON_MODEL", "gnani/gnani-evon-v3.3-30B-A3B").strip()
+                    or "gnani/gnani-evon-v3.3-30B-A3B",
+                    timeout_s=timeout_s,
+                )
+            )
         api_key = os.getenv("GROQ_API_KEY", "").strip()
         if api_key:
             try:
                 from langchain_groq import ChatGroq
             except Exception as exc:
-                logger.warning("Could not load Groq integration; using fallback: %s", exc)
-                return fallback
-            model_names = (
-                os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"),
-            )
-            for model_name in dict.fromkeys(model_names):
-                try:
-                    models.append(
-                        ChatGroq(
-                            api_key=api_key,
-                            model=model_name,
-                            temperature=0,
-                            max_retries=1,
-                        ).with_structured_output(_ModelOutput)
-                    )
-                except Exception as exc:
-                    logger.warning("Could not initialize Groq model %s: %s", model_name, exc)
-        else:
+                logger.warning("Could not load Groq integration; skipping Groq provider: %s", exc)
+            else:
+                model_names = (
+                    os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                    os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"),
+                )
+                for model_name in dict.fromkeys(model_names):
+                    try:
+                        models.append(
+                            ChatGroq(
+                                api_key=api_key,
+                                model=model_name,
+                                temperature=0,
+                                max_retries=1,
+                            ).with_structured_output(_ModelOutput)
+                        )
+                    except Exception as exc:
+                        logger.warning("Could not initialize Groq model %s: %s", model_name, exc)
+        if not models:
             return fallback
     else:
         models = [llm]
 
     context = f"Previous prompt/action: {expected_action or 'none'}. Interpret a short answer using this context."
-    messages = [("system", SYSTEM_PROMPT + "\n" + context), ("human", transcript)]
+    sys_prompt = SYSTEM_PROMPT + _build_language_prompt_addon(lang) + "\n" + context
+    messages = [("system", sys_prompt), ("human", redact_pii(transcript))]
     for model in models:
         try:
             result = await model.ainvoke(messages)

@@ -10,6 +10,7 @@ from asha_vani.schemas import SymptomCode, TriageLevel
 from asha_vani.voice.audio import (
     FRAME_BYTES,
     SAMPLE_RATE_HZ,
+    EnergyVAD,
     FrameBuffer,
     condition_telephone_audio,
     mix_snr_noise,
@@ -87,6 +88,42 @@ def test_eou_detector_flushes_on_over_keyword_and_strips_it() -> None:
     # Partial ending with 'over' flushes immediately and strips 'over'
     out = eou.feed(STTChunk(text="Pooja Devi ka BP 150 by 95 hai OVER", is_final=False))
     assert out == "Pooja Devi ka BP 150 by 95 hai"
+
+
+def test_energy_vad_detects_speech_start_and_end() -> None:
+    vad = EnergyVAD(energy_threshold=400.0, min_speech_frames=2, silence_hangover_frames=3)
+    silence = b"\x00" * 1024
+    speech = _make_sine_pcm16(freq_hz=440.0, duration_s=0.064)  # 512 samples = 1024 bytes
+
+    # Silence does not start speech
+    assert vad.process_frame(silence) is None
+    assert vad.is_speaking is False
+
+    # 2 speech frames trigger SPEECH_START
+    assert vad.process_frame(speech) is None
+    assert vad.process_frame(speech) == "SPEECH_START"
+    assert vad.is_speaking is True
+
+    # Silence frame 1 and 2 don't end speech yet (hangover is 3)
+    assert vad.process_frame(silence) is None
+    assert vad.process_frame(silence) is None
+    assert vad.is_speaking is True
+
+    # 3rd silence frame triggers SPEECH_END
+    assert vad.process_frame(silence) == "SPEECH_END"
+    assert vad.is_speaking is False
+
+
+def test_eou_flushes_on_vad_speech_end_signal() -> None:
+    eou = EndOfUtteranceDetector()
+    # Feed streaming partial speech while person is speaking
+    assert eou.feed(STTChunk(text="Rampur se Sunita Devi", is_final=False)) is None
+    assert eou.has_pending_speech is True
+
+    # VAD fires speech_end (empty text, is_final=True)
+    completed = eou.feed(STTChunk(text="", is_final=True))
+    assert completed == "Rampur se Sunita Devi"
+    assert eou.has_pending_speech is False
 
 
 def test_half_duplex_gate_enforces_200ms_tail_mute() -> None:

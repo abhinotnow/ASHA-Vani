@@ -3,21 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="ASHA-Vani 1-Page Solution Pitch: Voice-First Clinical Triage and Early-Warning Register Powered by Gnani Prisma STT and Timbre TTS." />
-  <title>ASHA-Vani: 1-Page Solution Pitch (Gnani Submission)</title>
+  <meta name="description" content="ASHA-Vani: A multilingual phone call powered by Gnani Prisma STT, Evon v3.3, and Timbre v2.5 TTS that turns village home visits into confirmed PHC records." />
+  <title>ASHA-Vani — Solution Pitch</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;600;700&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --color-paper: #ece7dc;
-      --color-sheet: #fdfbf7;
-      --color-ink: #1e1d1a;
-      --color-muted: #5a564e;
-      --color-rule: #d6cfc0;
-      --color-accent: #f26419;
-      --color-accent-soft: #f7dfd0;
-      --color-green-soft: #dfece0;
+      --bg-outer: #ebe5da;
+      --paper: #fcfaf5;
+      --sand: #f2ece1;
+      --ink: #1e1d1a;
+      --muted: #656056;
+      --rule: #ddd6c9;
+      --accent: #b85328;
+      --accent-pill: #f5dfd3;
+      --evon-pill: #eae6f5;
+      --timbre-pill: #e5eee7;
+      --green-bg: #e7f0e9;
+      --green-border: #2e6b4a;
       --font-display: "Red Hat Display", ui-sans-serif, system-ui, sans-serif;
       --font-body: "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
       --font-mono: "Red Hat Mono", ui-monospace, monospace;
@@ -31,17 +35,17 @@
 
     @page {
       size: A4 portrait;
-      margin: 10mm;
+      margin: 9mm 11mm;
     }
 
     body {
-      background: var(--color-paper);
-      color: var(--color-ink);
+      background: var(--bg-outer);
+      color: var(--ink);
       font-family: var(--font-body);
-      font-size: 9.2pt;
-      line-height: 1.38;
+      font-size: 9.4pt;
+      line-height: 1.44;
       -webkit-font-smoothing: antialiased;
-      padding: 18px;
+      padding: 16px;
     }
 
     .screen-toolbar {
@@ -55,157 +59,383 @@
     }
 
     .btn-print {
-      background: var(--color-accent);
-      color: var(--color-ink);
-      border: 1px solid var(--color-ink);
-      border-radius: 6px;
-      padding: 7px 14px;
+      background: var(--ink);
+      color: var(--paper);
+      border: 1px solid var(--ink);
+      border-radius: 5px;
+      padding: 6px 13px;
       font-family: var(--font-body);
       font-weight: 500;
-      font-size: 12px;
+      font-size: 11.5px;
       cursor: pointer;
+      text-decoration: none;
+    }
+
+    .btn-print.secondary {
+      background: var(--paper);
+      color: var(--ink);
     }
 
     .a4-sheet {
       width: 210mm;
-      min-height: 277mm;
-      max-height: 277mm;
+      min-height: 279mm;
       margin: 0 auto;
-      background: var(--color-sheet);
-      border: 1px solid var(--color-ink);
-      padding: 11mm 12mm;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      padding: 10mm 12mm;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      overflow: hidden;
+      gap: 11px;
     }
 
-    /* Header Masthead */
+    body.export-png {
+      background: var(--paper);
+      padding: 0;
+    }
+    body.export-png .screen-toolbar {
+      display: none !important;
+    }
+    body.export-png .a4-sheet {
+      border: 0;
+      width: 100%;
+      min-height: 100vh;
+      padding: 10mm 12mm;
+    }
+
+    /* Masthead */
     .masthead {
-      border-bottom: 2px solid var(--color-ink);
-      padding-bottom: 7px;
+      border-bottom: 1.6px solid var(--ink);
+      padding-bottom: 8px;
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
       gap: 12px;
     }
-    .masthead h1 {
+    .brand-name {
       font-family: var(--font-display);
-      font-size: 19pt;
+      font-size: 12pt;
       font-weight: 600;
-      letter-spacing: -0.03em;
-      line-height: 1;
+      letter-spacing: -0.01em;
     }
-    .masthead-sub {
-      font-size: 8.8pt;
-      color: var(--color-muted);
-      margin-top: 3px;
+    .brand-sub {
+      font-size: 8.6pt;
+      color: var(--muted);
+      margin-top: 2px;
     }
-    .masthead-tag {
-      background: var(--color-ink);
-      color: var(--color-sheet);
+    .challenge-badge {
+      background: var(--ink);
+      color: var(--paper);
       font-family: var(--font-mono);
-      font-size: 7.8pt;
-      padding: 4px 8px;
-      border-radius: 4px;
+      font-size: 7.4pt;
+      letter-spacing: 0.04em;
+      padding: 5px 10px;
+      border-radius: 3px;
       white-space: nowrap;
     }
 
-    /* 2-Column Body Grid */
-    .pitch-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 8px;
-      flex: 1;
+    /* Hero */
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: 21pt;
+      font-weight: 600;
+      line-height: 1.13;
+      letter-spacing: -0.025em;
+      margin-top: 2px;
+      margin-bottom: 7px;
+    }
+    .hero h1 .accent {
+      color: var(--accent);
+    }
+    .hero p {
+      font-size: 9.5pt;
+      color: #2f2c27;
+      line-height: 1.46;
     }
 
-    .col {
+    /* The Gap Callout */
+    .gap-box {
+      background: var(--sand);
+      border-left: 3.5px solid var(--accent);
+      padding: 9px 13px;
+      border-radius: 0 4px 4px 0;
+    }
+    .eyebrow-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+    .eyebrow-title {
+      font-family: var(--font-display);
+      font-size: 8.4pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .eyebrow-sub {
+      font-family: var(--font-mono);
+      font-size: 7pt;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .gap-box p {
+      font-size: 9pt;
+      line-height: 1.42;
+      color: #2c2924;
+    }
+
+    /* Visual Architecture Diagram */
+    .arch-section {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
-
-    .sec-title {
-      font-family: var(--font-display);
-      font-size: 10pt;
-      font-weight: 600;
-      border-bottom: 1px solid var(--color-ink);
-      padding-bottom: 2px;
-      margin-bottom: 3px;
+    .section-head {
       display: flex;
-      justify-content: space-between;
       align-items: baseline;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 4px;
     }
-    .sec-title span.num {
+    .section-head h2 {
+      font-family: var(--font-display);
+      font-size: 9pt;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .section-head span {
       font-family: var(--font-mono);
-      font-size: 7.8pt;
-      color: var(--color-muted);
+      font-size: 7pt;
+      color: var(--muted);
+      letter-spacing: 0.05em;
     }
 
-    p {
-      color: var(--color-ink);
+    .arch-flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: stretch;
+      gap: 5px;
+      background: var(--sand);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 8px 9px;
+    }
+    .arch-node {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 5px;
+      padding: 6px 7px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 3px;
+    }
+    .arch-node.gnani-prisma {
+      border-top: 2.5px solid var(--accent);
+    }
+    .arch-node.gnani-evon {
+      border-top: 2.5px solid #4d3c8c;
+    }
+    .arch-node.gnani-timbre {
+      border-top: 2.5px solid var(--green-border);
+    }
+    .arch-kicker {
+      font-family: var(--font-mono);
+      font-size: 6.4pt;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .arch-title {
+      font-family: var(--font-display);
+      font-size: 8.6pt;
+      font-weight: 600;
+      line-height: 1.15;
+    }
+    .arch-meta {
+      font-size: 7.3pt;
+      color: var(--muted);
+      line-height: 1.28;
+    }
+    .arch-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 11pt;
+      padding: 0 1px;
     }
 
-    ul {
+    /* 4 Step Rows */
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .step-row {
+      display: grid;
+      grid-template-columns: 28px 158px 1fr;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .step-row:last-child {
+      border-bottom: 0;
+    }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent-pill);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 8pt;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-label strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 9.2pt;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .step-label span {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 6.7pt;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .step-desc {
+      font-size: 8.7pt;
+      color: #2f2c27;
+      line-height: 1.38;
+    }
+
+    /* 3-Segment Gnani Models Bar */
+    .models-bar {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr 1fr;
+      border: 1.2px solid var(--ink);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--paper);
+    }
+    .model-seg {
+      padding: 7px 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      border-right: 1px solid var(--ink);
+    }
+    .model-seg:last-child {
+      border-right: 0;
+    }
+    .model-seg.prisma {
+      background: var(--accent-pill);
+    }
+    .model-seg.evon {
+      background: var(--evon-pill);
+    }
+    .model-seg.timbre {
+      background: var(--timbre-pill);
+    }
+    .model-seg strong {
+      font-family: var(--font-display);
+      font-size: 9.2pt;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .model-seg span {
+      font-family: var(--font-mono);
+      font-size: 6.8pt;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Bottom 2-Column Cards */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .card-green {
+      background: var(--green-bg);
+      border-left: 3.5px solid var(--green-border);
+      padding: 9px 12px;
+      border-radius: 0 5px 5px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .card-prospects {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 5px;
+      padding: 9px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 9.2pt;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .card-title-caps {
+      font-family: var(--font-display);
+      font-size: 8.4pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .card-green p,
+    .card-prospects ul {
+      font-size: 8.5pt;
+      line-height: 1.38;
+      color: #272521;
+    }
+    .card-prospects ul {
       padding-left: 14px;
       display: flex;
       flex-direction: column;
-      gap: 2.5px;
+      gap: 3px;
     }
 
-    .arch-strip {
-      background: var(--color-paper);
-      border: 1px solid var(--color-ink);
-      border-radius: 6px;
-      padding: 6px 8px;
-      font-family: var(--font-mono);
-      font-size: 7.6pt;
-      line-height: 1.45;
-    }
-
-    .rule-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 8pt;
-    }
-    .rule-table th {
-      text-align: left;
-      font-weight: 500;
-      color: var(--color-muted);
-      border-bottom: 1px solid var(--color-ink);
-      padding: 2px 4px;
-    }
-    .rule-table td {
-      padding: 2.5px 4px;
-      border-bottom: 1px solid var(--color-rule);
-      vertical-align: top;
-    }
-    .mono {
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-    }
-    .pill-crit {
-      background: var(--color-accent-soft);
-      padding: 1px 4px;
-      border-radius: 3px;
-      font-weight: 500;
-    }
-    .pill-urg {
-      background: var(--color-green-soft);
-      padding: 1px 4px;
-      border-radius: 3px;
-      font-weight: 500;
-    }
-
+    /* Footer */
     .footer-bar {
-      border-top: 1px solid var(--color-ink);
-      padding-top: 5px;
-      font-size: 7.8pt;
-      color: var(--color-muted);
+      border-top: 1px solid var(--rule);
+      padding-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 7.4pt;
+      color: var(--muted);
+    }
+    .footer-top {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .footer-tags {
+      font-family: var(--font-mono);
+      font-size: 7.1pt;
+      color: var(--ink);
     }
 
     @media print {
@@ -219,9 +449,9 @@
       .a4-sheet {
         border: 0;
         width: 100%;
-        max-height: none;
         min-height: 0;
         padding: 0;
+        gap: 9px;
       }
     }
   </style>
@@ -229,151 +459,181 @@
 <body>
 
   <div class="screen-toolbar">
-    <span><strong>ASHA-Vani 1-Page Executive Solution Pitch</strong> · Formatted for single-page A4 PDF export</span>
+    <span><strong>ASHA-Vani Solution Pitch</strong> · 1-Page Executive Summary</span>
     <div style="display: flex; gap: 8px;">
-      <a href="/furrow" class="btn-print" style="text-decoration: none; background: var(--color-sheet);">Open Furrow UI (/furrow)</a>
-      <button class="btn-print" type="button" onclick="window.print()">Print / Save as 1-Page PDF</button>
+      <a href="/furrow" class="btn-print secondary">Open Field Register (/furrow)</a>
+      <button class="btn-print" type="button" onclick="window.print()">Print / Save A4 PDF</button>
     </div>
   </div>
 
   <article class="a4-sheet">
-    <div>
-      <header class="masthead">
-        <div>
-          <h1>ASHA-Vani: Voice-First Clinical Triage &amp; Register</h1>
-          <div class="masthead-sub">
-            Real-time Hindi/Hinglish decision support &amp; early-warning ledger for rural Indian ASHA workers · Powered by <strong>Gnani Prisma STT</strong> &amp; <strong>Gnani Timbre v2.5 TTS</strong>
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <div>
+        <div class="brand-name">ASHA-Vani</div>
+        <div class="brand-sub">A multilingual phone call that turns a village home visit into a confirmed record for the PHC.</div>
+      </div>
+      <div class="challenge-badge">GNANI GREAT INDIAN AI CHALLENGE</div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <h1>
+        When an ASHA hears a warning sign in a village home, <span class="accent">the PHC should hear it too</span>—while the visit is still fresh.
+      </h1>
+      <p>
+        Nearly one million ASHAs are the first point of contact for rural families across India, yet visit notes still start on paper and mobile apps require typing and smartphone data. ASHA-Vani lets any worker report from a basic feature phone simply by speaking naturally in <strong>Hindi, Tamil, or Telugu</strong> (including code-mixed Hinglish, Tanglish, and Telglish), built on a drop-in locale architecture ready to scale across <strong>all 10 Gnani Indian languages</strong>.
+      </p>
+    </section>
+
+    <!-- CALLOUT -->
+    <section class="gap-box">
+      <div class="eyebrow-row">
+        <span class="eyebrow-title">The Gap</span>
+        <span class="eyebrow-sub">From village visit to PHC awareness</span>
+      </div>
+      <p>
+        A high blood-pressure reading or danger symptom matters in the moment, but on paper it can wait days to reach the Primary Health Centre. With ASHA-Vani, callers dial a toll-free line, receive a warm trilingual greeting (<em>"Namaste! Vanakkam! Namaskaram!"</em>), verify their 3-digit ASHA ID by voice or keypad, and report the visit live in their own language.
+      </p>
+    </section>
+
+    <!-- VISUAL ARCHITECTURE -->
+    <section class="arch-section">
+      <div class="section-head">
+        <h2>Voice-to-Register Architecture</h2>
+        <span>Gnani Voice In &middot; Confirmed PHC Record Out</span>
+      </div>
+      <div class="arch-flow">
+        <div class="arch-node">
+          <div class="arch-kicker">01 &middot; Telephony</div>
+          <div class="arch-title">Feature Phone</div>
+          <div class="arch-meta">8 kHz audio, Energy VAD, ASHA ID &amp; Keypad 9 language toggle</div>
+        </div>
+        <div class="arch-arrow">&rarr;</div>
+        <div class="arch-node gnani-prisma">
+          <div class="arch-kicker">02 &middot; Gnani ASR</div>
+          <div class="arch-title">Prisma v3.0 STT</div>
+          <div class="arch-meta">Streaming Hindi, Tamil, Telugu &amp; indic-auto code-mixed speech</div>
+        </div>
+        <div class="arch-arrow">&rarr;</div>
+        <div class="arch-node gnani-evon">
+          <div class="arch-kicker">03 &middot; Gnani LLM</div>
+          <div class="arch-title">Evon v3.3 (30B-A3B)</div>
+          <div class="arch-meta">Pre-LLM PII redaction, vitals extraction &amp; Roman Title Case</div>
+        </div>
+        <div class="arch-arrow">&rarr;</div>
+        <div class="arch-node gnani-timbre">
+          <div class="arch-kicker">04 &middot; Readback &amp; PHC</div>
+          <div class="arch-title">Timbre v2.5 + Register</div>
+          <div class="arch-meta">Native confirm-back &amp; verified record on live PHC console</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW THE CALL BECOMES A RECORD -->
+    <section class="arch-section">
+      <div class="section-head">
+        <h2>How the Call Becomes a Record</h2>
+        <span>4-Step Multilingual Loop</span>
+      </div>
+      <div class="steps-list">
+        <div class="step-row">
+          <div class="step-num">01</div>
+          <div class="step-label">
+            <strong>Listen</strong>
+            <span>Gnani Prisma STT</span>
+          </div>
+          <div class="step-desc">
+            8 kHz speech in Hindi, Tamil, or Telugu (and Hinglish/Tanglish/Telglish) streams through an Energy VAD gate so the worker is never cut off mid-sentence.
           </div>
         </div>
-        <div class="masthead-tag">1-PAGE SOLUTION PITCH</div>
-      </header>
-
-      <div class="pitch-grid">
-        <!-- LEFT COLUMN -->
-        <div class="col">
-          <section>
-            <div class="sec-title"><span>1. The Rural Clinical Bottleneck</span> <span class="num">PROBLEM</span></div>
-            <p>
-              Over <strong>1 million rural ASHA workers</strong> conduct doorstep maternal and general health visits across India, often using basic 2G feature phones in noisy village environments. Vital signs (blood pressure, hemoglobin, gestational weeks, danger signs) are written into paper registers and digitized days later at the Primary Health Centre (PHC). By the time severe preeclampsia (<span class="mono">BP &ge; 160/110</span>) or critical anemia (<span class="mono">Hb &lt; 5.0 g/dL</span>) is spotted by a Medical Officer, the window for early referral has often closed.
-            </p>
-          </section>
-
-          <section>
-            <div class="sec-title"><span>2. The ASHA-Vani Solution</span> <span class="num">OVERVIEW</span></div>
-            <p>
-              <strong>ASHA-Vani</strong> turns any basic feature phone or Exotel PSTN line into a voice-verified clinical register. The ASHA dials in and speaks naturally in <strong>Hindi or Hinglish</strong> (or dials DTMF keys when network audio is severe). Each spoken turn streams through <strong>Gnani Prisma STT</strong>, updates a <strong>7-step LangGraph intake state machine</strong>, runs hard physiological range checks and deterministic clinical rules (<span class="mono">R1–R8</span>), speaks a <strong>digit-by-digit confirm-back via Gnani Timbre TTS</strong>, and streams live updates to the PHC Medical Officer Console.
-            </p>
-          </section>
-
-          <section>
-            <div class="sec-title"><span>3. End-to-End Voice Pipeline</span> <span class="num">ARCHITECTURE</span></div>
-            <div class="arch-strip">
-              [2G Handset / Exotel PSTN] &rarr; 8 kHz PCM16 &middot; 300-3400 Hz &middot; &mu;-law (1024B frames)<br/>
-              &darr; Half-Duplex Gate (mutes mic during TTS + 200 ms acoustic tail)<br/>
-              [Gnani Prisma STT] &rarr; EOU Detector (~1.2s pause OR trailing "over")<br/>
-              &darr; TurnRunner Queue (strictly ordered per session_id)<br/>
-              [LangGraph CallState] &rarr; Extract (Llama 3.3 70B) &rarr; Validate &rarr; Triage (R1-R8)<br/>
-              &darr; Digit-by-digit readback (&rarr; [Gnani Timbre v2.5 TTS] w/ WAV cache)<br/>
-              [PHC Register Console + Supabase] &rarr; 1-Click 108 / ANM Home Dispatch
-            </div>
-          </section>
-
-          <section>
-            <div class="sec-title"><span>4. Deep Gnani.ai Integration</span> <span class="num">PRISMA + TIMBRE</span></div>
-            <ul>
-              <li><strong>8 kHz Telephony Conditioning (<span class="mono">voice/audio.py</span>):</strong> Resamples browser/PSTN audio to 8 kHz mono PCM16, applies 300–3400 Hz bandpass filtering, <span class="mono">&mu;</span>-law companding, exact <strong>1024-byte (64 ms)</strong> framing, and calibrated SNR noise injection (<span class="mono">15 dB / 5 dB</span>).</li>
-              <li><strong>Gnani Prisma STT (<span class="mono">voice/stt.py</span>):</strong> Streaming Hindi/Hinglish &amp; Devanagari recognition with dual End-of-Utterance detection (<span class="mono">1.2s</span> silence or trailing <span class="mono">"over"</span> keyword stripped before extraction).</li>
-              <li><strong>Gnani Timbre v2.5 TTS (<span class="mono">voice/tts.py</span>):</strong> Low-latency 8 kHz PCM/WAV synthesis (<span class="mono">Poorvi</span>/<span class="mono">Nalini</span> voices) with an in-memory fixed-script cache so greeting and follow-up prompts cost zero extra synthesis latency.</li>
-              <li><strong>Half-Duplex Anti-Echo Gate (<span class="mono">voice/session.py</span>):</strong> Drops incoming mic frames during TTS playback plus a <strong>200 ms tail mute</strong> so loudspeaker handsets never re-transcribe their own prompts.</li>
-            </ul>
-          </section>
+        <div class="step-row">
+          <div class="step-num">02</div>
+          <div class="step-label">
+            <strong>Understand</strong>
+            <span>Gnani Evon v3.3 LLM</span>
+          </div>
+          <div class="step-desc">
+            Phone and Aadhaar numbers are redacted pre-LLM; Evon extracts patient, vitals (<em>"dedh sau by pachhanave"</em> &rarr; 150/95), and symptoms with <code>enable_thinking=False</code>, backed by Groq/regex failover.
+          </div>
         </div>
-
-        <!-- RIGHT COLUMN -->
-        <div class="col">
-          <section>
-            <div class="sec-title"><span>5. Clinical Safety Invariants</span> <span class="num">SAFETY BY DESIGN</span></div>
-            <ul>
-              <li><strong>The LLM Extracts; Deterministic Code Decides:</strong> The model only extracts candidate slots (<span class="mono">ExtractedVisit</span>). Risk level is never assigned by an LLM—it is computed 100% deterministically in <span class="mono">triage.py</span>.</li>
-              <li><strong>Refuse to Guess (Hard/Soft Range Guards):</strong> Impossible ASR values (e.g., <span class="mono">BP 420/110</span>, <span class="mono">Hb 28.0</span>, or <span class="mono">systolic &le; diastolic</span>) fail hard validation (<span class="mono">ERROR</span>), are cleared to <span class="mono">None</span>, and trigger a targeted repeat question without hiding co-occurring critical symptoms.</li>
-              <li><strong>Alert Early, Commit Late:</strong> High-risk cases appear on the PHC console on Turn 1 marked <span class="mono">UNVERIFIED (In Call)</span> for early awareness, flipping to <span class="mono">VERIFIED</span> only after the ASHA confirms the spoken readback (<em>"Haan, sahi hai"</em>).</li>
-              <li><strong>General &amp; Maternal Pathways:</strong> If a patient is non-pregnant (<span class="mono">is_pregnant=False</span>), the state machine automatically skips gestational weeks and evaluates general vitals, severe anemia, fever, and neurological danger signs.</li>
-            </ul>
-          </section>
-
-          <section>
-            <div class="sec-title"><span>6. Deterministic Triage Rules (R1–R8)</span> <span class="num">RULE ENGINE</span></div>
-            <table class="rule-table">
-              <thead>
-                <tr>
-                  <th>Rule</th>
-                  <th>Risk</th>
-                  <th>Deterministic Clinical Trigger</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="mono">R1</td>
-                  <td><span class="pill-crit">CRITICAL</span></td>
-                  <td>Severe hypertension: <span class="mono">BP &ge; 160 sys</span> or <span class="mono">&ge; 110 dia</span></td>
-                </tr>
-                <tr>
-                  <td class="mono">R2</td>
-                  <td><span class="pill-crit">CRITICAL</span></td>
-                  <td>Elevated BP (<span class="mono">&ge; 140/90</span>) + severe headache, blurred vision, epigastric pain, or facial edema</td>
-                </tr>
-                <tr>
-                  <td class="mono">R3</td>
-                  <td><span class="pill-urg">URGENT</span></td>
-                  <td>Moderate hypertension (<span class="mono">&ge; 140/90</span>) without severe features</td>
-                </tr>
-                <tr>
-                  <td class="mono">R4</td>
-                  <td><span class="pill-crit">CRITICAL</span></td>
-                  <td>Antepartum vaginal bleeding at <span class="mono">&ge; 20 weeks</span></td>
-                </tr>
-                <tr>
-                  <td class="mono">R5</td>
-                  <td><span class="pill-crit">CRIT</span>/<span class="pill-urg">URG</span></td>
-                  <td>Hemoglobin <span class="mono">&lt; 5.0 g/dL</span> (Critical) or <span class="mono">5.0–6.9 g/dL</span> (Urgent)</td>
-                </tr>
-                <tr>
-                  <td class="mono">R6</td>
-                  <td><span class="pill-crit">CRITICAL</span></td>
-                  <td>Eclampsia convulsion/seizure or unconsciousness (any BP)</td>
-                </tr>
-                <tr>
-                  <td class="mono">R7</td>
-                  <td><span class="pill-crit">CRITICAL</span></td>
-                  <td>Preterm labour pains or leaking fluid at <span class="mono">&lt; 37 weeks</span></td>
-                </tr>
-                <tr>
-                  <td class="mono">R8</td>
-                  <td><span class="pill-urg">URGENT</span></td>
-                  <td>Reduced fetal movement at <span class="mono">&ge; 28 weeks</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-
-          <section>
-            <div class="sec-title"><span>7. Verification &amp; Live Deliverables</span> <span class="num">69 TESTS PASSING</span></div>
-            <ul>
-              <li><strong>69 Automated Pytest Tests Passing:</strong> Full coverage across <span class="mono">test_validation.py</span>, <span class="mono">test_triage.py</span>, <span class="mono">test_extraction.py</span>, <span class="mono">test_graph_flow.py</span>, <span class="mono">test_persistence.py</span>, and <span class="mono">test_voice.py</span>.</li>
-              <li><strong>PHC Register + Nokia 2G Handset Workspaces:</strong> Live WebSocket console (<span class="mono">/furrow</span> &amp; <span class="mono">/simulator</span>) with Waterproof Field-Notebook Card, Turn-by-Turn Voice Transcript Sheet, DTMF keypad, Exotel PSTN mode, and Supabase persistence.</li>
-            </ul>
-          </section>
+        <div class="step-row">
+          <div class="step-num">03</div>
+          <div class="step-label">
+            <strong>Check &amp; read back</strong>
+            <span>Gnani Timbre v2.5 TTS</span>
+          </div>
+          <div class="step-desc">
+            Bounds are checked before speaking back captured numbers digit-by-digit in the worker's native voice (<em>Poorvi</em> Hindi, <em>Asmita</em> Tamil, <em>Suhana</em> Telugu) with half-duplex anti-echo muting.
+          </div>
         </div>
+        <div class="step-row">
+          <div class="step-num">04</div>
+          <div class="step-label">
+            <strong>Confirm &amp; share</strong>
+            <span>PHC Register Console</span>
+          </div>
+          <div class="step-desc">
+            The ASHA confirms or corrects any detail aloud. Only after spoken confirmation does the PHC dashboard mark the visit verified alongside the full-call WAV audio.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GNANI MODELS STRIP -->
+    <div class="models-bar">
+      <div class="model-seg prisma">
+        <strong>Prisma v3.0</strong>
+        <span>Speech to Text</span>
+      </div>
+      <div class="model-seg evon">
+        <strong>Evon v3.3 (30B)</strong>
+        <span>Clinical Extraction</span>
+      </div>
+      <div class="model-seg timbre">
+        <strong>Timbre v2.5</strong>
+        <span>Text to Speech</span>
       </div>
     </div>
 
+    <!-- BOTTOM 2 CARDS: MULTILINGUAL SAFETY & FUTURE PROSPECTS -->
+    <section class="bottom-grid">
+      <div class="card-green">
+        <div class="card-title">Multilingual by design &amp; built for safety</div>
+        <p>
+          <strong>Pan-India languages:</strong> Auto-detects Hindi, Tamil, and Telugu via <code>indic-auto</code> (or mid-call via Keypad <code>9</code>), and scales to 10 Indian languages using JSON locales while transliterating names to English Title Case for doctors.
+        </p>
+        <p>
+          <strong>Human-in-the-loop safety:</strong> Unclear measurements trigger a polite repeat, records stay <em>unverified</em> until confirmed aloud, and PHC staff always own clinical follow-up and referral decisions.
+        </p>
+      </div>
+
+      <div class="card-prospects">
+        <div class="card-title-caps">Future Prospects &amp; Scalability</div>
+        <ul>
+          <li><strong>Household Medicine Kit Tracking:</strong> Log IFA, ORS, Zinc, Calcium, and TT supplies per household caretaker to prevent village stockouts.</li>
+          <li><strong>Automated Due-Lists &amp; HBNC:</strong> Auto-generate monthly ANC and child vaccination due-lists alongside 6-visit newborn follow-ups.</li>
+          <li><strong>Cluster PHC + SMS Receipts:</strong> One PHC operator serves 10–25 villages while confirmed calls send local-script SMS receipts for ASHA incentives.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
     <footer class="footer-bar">
-      <span><strong>ASHA-Vani</strong> · Voice-First Rural Clinical Decision Support</span>
-      <span class="mono">Routes: /furrow · /simulator · /pitch · /ws/call · /ws/console</span>
-      <span>All simulated telephony &amp; dispatch actions carry explicit <strong>SIM</strong> labels</span>
+      <div class="footer-top">
+        <span><strong>ASHA-Vani</strong> &middot; Multilingual voice-first rural health decision support (SIM demo environment)</span>
+        <span>Powered by <strong>Gnani Prisma</strong> &middot; <strong>Gnani Evon v3.3</strong> &middot; <strong>Gnani Timbre v2.5</strong></span>
+      </div>
+      <div class="footer-tags">
+        #GreatIndianAIInternshipChallenge &middot; #GreatIndianInternship &middot; #GnaniAI &middot; #BuildForIndia &middot; #AIForStudents
+      </div>
     </footer>
   </article>
 
+  <script>
+    if (new URLSearchParams(window.location.search).get("export") === "1") {
+      document.body.classList.add("export-png");
+    }
+  </script>
 </body>
 </html>
-

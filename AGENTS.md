@@ -23,7 +23,7 @@ Do **not** edit the other person's files without coordinating first.
 |---|---|---|
 | **Person B (Logic, Data & Graph)** | `src/asha_vani/schemas.py`<br>`src/asha_vani/validation.py`<br>`src/asha_vani/triage.py`<br>`src/asha_vani/graph.py`<br>`tests/test_validation.py`<br>`tests/test_triage.py`<br>`docs/person-b-build.md` | Shared Pydantic schemas, hard/soft range validation, deterministic rule engine (`R1–R8`), LangGraph conversation state machine (`call_graph`), LLM extraction node, and Supabase persistence. |
 | **Person A (Voice, Session & Simulator)** | `src/asha_vani/voice/audio.py`<br>`src/asha_vani/voice/events.py`<br>`src/asha_vani/voice/turn_runner.py`<br>`src/asha_vani/voice/stt.py`<br>`src/asha_vani/voice/tts.py`<br>`src/asha_vani/voice/session.py`<br>`src/asha_vani/voice/simulator.html`<br>`src/asha_vani/server.py`<br>`tests/test_voice.py`<br>`docs/person-a-build.md` | 8 kHz PCM16 / 300–3400 Hz / $\mu$-law / 1024-byte audio conditioning, Gnani Prisma STT & Timbre TTS clients, `CallSession` queues, half-duplex speaker muting, `"over"` + pause end-of-utterance detection, FastAPI WebSockets, and the 75/25 PHC Register + Nokia Simulator workspace. |
-| **Shared / Root** | `AGENTS.md`, `README.md`, `pyproject.toml` | Project-wide rules, system connection map, and dependency manifest. |
+| **Shared / Root** | `AGENTS.md`, `README.md`, `pyproject.toml`, `src/asha_vani/language/`, `data/asha_workers.json` | Project-wide rules, system connection map, dependency manifest, locale files (`hi`/`ta`/`te`), ASHA worker phone registry, and language routing. |
 
 ---
 

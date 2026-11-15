@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "code": "ta",
+    "bcp47": "ta-IN",
+    "name_native": "தமிழ்",
+    "name_en": "Tamil",
+    "tts": {
+      "voice": "Asmita",
+      "language": "ta-IN",
+      "model": "timbre-v2.5"
+    },
+    "stt": {
+      "language_code": "ta-IN"
+    },
+    "transliteration_scheme": "tamil"
+  },
+  "prompts": {
+    "greeting": "வணக்கம் அக்கா! ASHA-Vani-க்கு வரவேற்கிறோம். நீங்கள் எந்த ஊரில் இருக்கிறீர்கள், எந்த patient வீட்டிலிருந்து பேசுகிறீர்கள்?",
+    "greeting_known_worker": "வணக்கம் {short_name} அக்கா ({asha_id})! ASHA-Vani-க்கு வரவேற்கிறோம். Patient-ன் முழு பெயரும் ஊரும் சொல்லுங்கள்.",
+    "greet_worker_ask_patient": "சரி {short_name} அக்கா ({asha_id}), patient-ன் முழு பெயரும் ஊரும் சொல்லுங்கள்.",
+    "ask_asha_id": "உங்கள் 3-digit ASHA worker ID சொல்லுங்கள்.",
+    "ASK_PATIENT_NAME": "அக்கா, patient-ன் முழு பெயரும் ஊரும் சொல்லுங்கள்.",
+    "ASK_SPOUSE_NAME": "சரி அக்கா, கணவர் (husband) பெயர் என்ன?",
+    "ASK_WEEKS": "சரி. Pregnancy எத்தனை weeks ஆகிறது? கர்ப்பம் இல்லை என்றால் zero என்று சொல்லுங்கள்.",
+    "ASK_BP": "சரி, அவர்களுக்கு BP (blood pressure) எவ்வளவு உள்ளது? Systolic மற்றும் diastolic இரண்டு எண்ணையும் சொல்லுங்கள்.",
+    "ASK_BP_NON_PREGNANT": "சரி அக்கா, Non-Pregnant checkup குறிக்கப்பட்டது. அவர்களுக்கு BP (blood pressure) எவ்வளவு உள்ளது? Systolic மற்றும் diastolic இரண்டு எண்ணையும் சொல்லுங்கள்.",
+    "ASK_HB": "அவர்களின் Hemoglobin (Hb) எவ்வளவு உள்ளது, வேறு ஏதாவது அறிகுறி அல்லது சிரமம் உள்ளதா?",
+    "ASK_SYMPTOMS": "அவர்களுக்கு வயிற்று வலி, கடுமையான தலைவலி, மங்கலான பார்வை, bleeding, வலிப்பு, வீக்கம், நீர் கசிவு, அல்லது குழந்தையின் அசைவு குறைவு உள்ளதா?",
+    "confirm_routine": "நன்றி அக்கா. {label} பதிவு confirm செய்யப்பட்டது. வேறு ஒரு பெண்ணின் தகவலை கொடுக்க வேண்டுமா?",
+    "confirm_escalate": "நன்றி அக்கா. {label} பதிவு confirm செய்யப்பட்டது. Screening {level} ஆக உள்ளது, உடனே PHC குழுவைத் தொடர்பு கொள்ளவும். வேறு ஒரு பெண்ணின் தகவலை கொடுக்க வேண்டுமா?",
+    "next_patient": "சரி அக்கா. அடுத்த patient-ன் முழு பெயரும் ஊரும் சொல்லுங்கள்.",
+    "finish_call": "நன்றி அக்கா. ASHA-Vani அழைப்பு இப்போது முடிகிறது. வணக்கம்.",
+    "continue_prompt": "அக்கா, வேறு ஒரு கர்ப்பிணிப் பெண்ணின் தகவலை கொடுக்க வேண்டுமா? ஆமாம் அல்லது இல்லை என்று சொல்லுங்கள்.",
+    "history_match": "{village} ஊரைச் சேர்ந்த {name}-ன் பழைய பதிவு உள்ளது. இவர் அதே patient தானா? ஆமாம் அல்லது இல்லை என்று சொல்லுங்கள்.",
+    "history_yes": "சரி. அவர்களின் முந்தைய visit summary கேட்க வேண்டுமா? ஆமாம் அல்லது இல்லை என்று சொல்லுங்கள்.",
+    "history_another": "சரி. இன்னொரு பழைய பதிவு உள்ளது: {name}, ஊர் {village}, கணவர்/பாதுகாவலர் {spouse}. இவர் அதே patient தானா?",
+    "history_no_more": "சரி, இதை புதிய patient-ஆக பதிவு செய்கிறேன்.",
+    "read_history": "முந்தைய visit-ல் {name}-க்கு {details} பதிவாகியுள்ளது. இது பழைய பதிவு மட்டுமே. {prompt}",
+    "read_history_default_prompt": "இப்போது புதிய visit தகவலை confirm செய்யுங்கள்.",
+    "history_repeat": "அக்கா, முந்தைய visit summary கேட்க வேண்டுமா? ஆமாம் அல்லது இல்லை என்று சொல்லுங்கள்.",
+    "correct_generic": "சரி அக்கா. எந்த தகவல் தவறாக உள்ளது? சரியான மதிப்பை மீண்டும் சொல்லுங்கள்.",
+    "correct_spouse": "சரி அக்கா. கணவரின் சரியான பெயரைச் சொல்லுங்கள்.",
+    "correct_patient": "சரி அக்கா. Patient-ன் சரியான பெயரைச் சொல்லுங்கள்.",
+    "correct_bp": "சரி அக்கா. சரியான BP இரண்டு எண்களையும் சொல்லுங்கள்.",
+    "correct_weeks": "சரி அக்கா. Pregnancy-யின் சரியான weeks எண்ணிக்கையைச் சொல்லுங்கள்.",
+    "correct_hb": "சரி அக்கா. சரியான Hemoglobin (Hb) அளவைச் சொல்லுங்கள்.",
+    "repeat_bp": "தயவுசெய்து BP இரண்டு எண்களையும் மீண்டும் சொல்லுங்கள்.",
+    "repeat_generic": "{message} தயவுசெய்து சரியான மதிப்பை மீண்டும் சொல்லுங்கள்.",
+    "repeat_escalate_prefix": "Screening {level} ஆக உள்ளது, உடனே PHC குழுவைத் தொடர்பு கொள்ளவும். {prompt}",
+    "collect_confirm_fallback": "தயவுசெய்து இந்த தகவல்களை confirm செய்யுங்கள்.",
+    "readback_empty": "இதுவரை எந்த visit தகவலும் பதிவாகவில்லை",
+    "readback_changed": "சரி, மாற்றப்பட்டது: {changed_summary}. Screening {level} ஆக உள்ளது. இந்த தகவல் சரியா?",
+    "readback": "அக்கா, confirm செய்யுங்கள்: {summary}. Screening {level} ஆக உள்ளது. இந்த தகவல் சரியா?",
+    "language_switched": "சரி அக்கா, இனி தமிழில் பேசுகிறேன்.",
+    "language_menu": "மொழி மாற்ற: Hindi-க்கு 1, Tamil-க்கு 2, Telugu-க்கு 3 அழுத்தவும்."
+  },
+  "readback_fields": {
+    "patient_name": "patient பெயர் {name}",
+    "spouse_name": ", கணவர் பெயர் {spouse}",
+    "village": ", ஊர் {village}",
+    "weeks": "{weeks} weeks",
+    "non_pregnant": "Non-Pregnant Checkup",
+    "bp": "BP {sys} by {dia}",
+    "hb": "Hemoglobin {hb} g/dL",
+    "no_danger_signs": "அபாய அறிகுறிகள் இல்லை",
+    "symptom_absent": "{label} இல்லை"
+  },
+  "symptom_labels": {
+    "SEVERE_HEADACHE": "கடுமையான தலைவலி",
+    "BLURRED_VISION": "மங்கலான பார்வை",
+    "EPIGASTRIC_PAIN": "வயிற்று வலி",
+    "CONVULSION": "வலிப்பு",
+    "UNCONSCIOUS": "மயக்கம்",
+    "VAGINAL_BLEEDING": "bleeding",
+    "LABOUR_PAINS": "பிரசவ வலி",
+    "LEAKING_FLUID": "நீர் கசிவு",
+    "REDUCED_FETAL_MOVEMENT": "குழந்தை அசைவு குறைவு",
+    "SWELLING": "வீக்கம்"
+  },
+  "lexicon": {
+    "yes": [
+      "aamaa", "aama", "aamam", "sari", "seri", "yes", "correct", "ok",
+      "ஆமா", "ஆமாம்", "ஆம்", "சரி"
+    ],
+    "no": [
+      "illa", "illai", "ille", "venaam", "vendam", "thappu", "no", "wrong",
+      "இல்லை", "இல்ல", "வேண்டாம்", "தப்பு", "தவறு"
+    ],
+    "negation_words": ["illa", "illai", "ille", "no", "not", "இல்லை", "இல்ல"],
+    "general_denial": [
+      "no symptoms", "ethuvum illa", "onnum illa", "entha prachinaiyum illa",
+      "அறிகுறி இல்லை", "ஒன்னும் இல்லை", "எதுவும் இல்லை", "பிரச்சனை இல்லை"
+    ],
+    "symptoms": {
+      "SEVERE_HEADACHE": [
+        "severe headache", "headache", "thalai vali", "thala vali", "romba thalai vali",
+        "தலைவலி", "தலை வலி", "கடுமையான தலைவலி"
+      ],
+      "BLURRED_VISION": [
+        "blurred vision", "blurry vision", "kan mangal", "mangala theriyudhu", "parvai mangal",
+        "மங்கலான பார்வை", "கண் மங்கல்", "மங்கலா தெரியுது"
+      ],
+      "EPIGASTRIC_PAIN": [
+        "epigastric", "stomach pain", "vayiru vali", "vayitru vali", "mel vayiru vali",
+        "வயிற்று வலி", "வயிறு வலி", "மேல் வயிறு வலி"
+      ],
+      "CONVULSION": [
+        "convulsion", "seizure", "fits", "valippu", "kaka valippu",
+        "வலிப்பு", "இழுப்பு"
+      ],
+      "UNCONSCIOUS": [
+        "unconscious", "mayakkam", "mayangi", "suyaninaivu illa",
+        "மயக்கம்", "சுயநினைவு இல்லை"
+      ],
+      "VAGINAL_BLEEDING": [
+        "vaginal bleeding", "bleeding", "heavy bleeding", "rathapokku", "ratham varudhu", "rattham",
+        "ரத்தப்போக்கு", "இரத்தப்போக்கு", "ரத்தம் வருது", "ப்ளீடிங்"
+      ],
+      "LABOUR_PAINS": [
+        "labour pain", "labor pain", "prasava vali", "prasava vedhanai",
+        "பிரசவ வலி"
+      ],
+      "LEAKING_FLUID": [
+        "leaking fluid", "water broke", "neer kasivu", "thanni varudhu", "pani kudam",
+        "நீர் கசிவு", "தண்ணி வருது", "பனிக்குடம்"
+      ],
+      "REDUCED_FETAL_MOVEMENT": [
+        "reduced fetal movement", "kuzhandhai asaivu kammi", "pappa asaivu kammi", "asaivu kammi",
+        "குழந்தை அசைவு குறைவு", "அசைவு கம்மி"
+      ],
+      "SWELLING": [
+        "swelling", "edema", "oedema", "veekkam", "kai kaal veekkam",
+        "வீக்கம்", "கை கால் வீக்கம்"
+      ]
+    },
+    "keywords": {
+      "spouse": ["purushan", "kanavar", "husband", "spouse", "கணவர்", "புருஷன்"],
+      "patient": ["patient", "noyali", "ponnu", "per", "peyar", "நோயாளி", "பெயர்"],
+      "weeks": ["weeks", "week", "vaaram", "varam", "வாரம்"],
+      "bp": ["bp", "blood pressure", "பிபி"],
+      "hb": ["hb", "hemoglobin", "ratham", "ஹீமோகுளோபின்", "எச்பி"],
+      "not_pregnant": [
+        "garbam illa", "garbham illai", "pregnant illa", "not pregnant",
+        "postnatal", "pnc", "prasavam aachhu", "கர்ப்பம் இல்லை"
+      ]
+    },
+    "numbers": {
+      "nooru aimbadhu": "150",
+      "nooru ambadhu": "150",
+      "nooru aruvathu": "160",
+      "nooru ezhuvathu": "170",
+      "nooru enbadhu": "180",
+      "nooru naarpadhu": "140",
+      "nooru muppadhu": "130",
+      "nooru irubadhu": "120",
+      "thonnooru": "90",
+      "thonnootru aindhu": "95",
+      "enbadhu": "80",
+      "ezhuvathu": "70",
+      "muppathu irandu": "32",
+      "irubathu ettu": "28",
+      "poojyam": "0",
+      "zero": "0",
+      "நூற்று ஐம்பது": "150",
+      "நூற்று அறுபது": "160",
+      "தொண்ணூற்று ஐந்து": "95",
+      "தொண்ணூறு": "90",
+      "பூஜ்யம்": "0"
+    },
+    "switch_request": [
+      "tamil mein", "tamil me", "tamil la", "tamil-la", "tamil lo", "தமிழில்", "தமிழ்"
+    ],
+    "is_not_me": [
+      "naan illa", "naan illai", "vera asha", "நான் இல்லை"
+    ]
+  }
+}
+

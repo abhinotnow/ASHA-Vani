@@ -1,0 +1,193 @@
+{
+  "meta": {
+    "code": "hi",
+    "bcp47": "hi-IN",
+    "name_native": "हिन्दी / Hinglish",
+    "name_en": "Hindi",
+    "tts": {
+      "voice": "Poorvi",
+      "language": "auto",
+      "model": "timbre-v2.5"
+    },
+    "stt": {
+      "language_code": "hi-IN"
+    },
+    "transliteration_scheme": "devanagari"
+  },
+  "prompts": {
+    "greeting": "Namaste Didi! ASHA-Vani mein aapka swagat hai. Aap kis gaon mein hain aur kis marij ke ghar se bol rahi hain?",
+    "greeting_known_worker": "Namaste {short_name} Didi ({asha_id})! ASHA-Vani mein aapka swagat hai. Marij (patient) ka poora naam aur gaon batayein.",
+    "greet_worker_ask_patient": "Ji {short_name} Didi ({asha_id}), marij (patient) ka poora naam aur gaon batayein.",
+    "ask_asha_id": "Kripya apna 3-digit ASHA worker ID batayein.",
+    "ASK_PATIENT_NAME": "Didi, marij (patient) ka poora naam aur gaon batayein.",
+    "ASK_SPOUSE_NAME": "Ji Didi, pati (husband) ka naam kya hai?",
+    "ASK_WEEKS": "Theek hai. Unke pregnancy ke kitne hafte (weeks) hue hain? Agar garbhvati nahi hain toh zero batayein.",
+    "ASK_BP": "Ji, unka BP (blood pressure) kitna aaya hai? Systolic aur diastolic dono number batayein.",
+    "ASK_BP_NON_PREGNANT": "Ji Didi, Non-Pregnant checkup note ho gaya. Unka BP (blood pressure) kitna aaya hai? Systolic aur diastolic dono number batayein.",
+    "ASK_HB": "Unka Hemoglobin (Hb) kitna aaya hai, aur koi takleef ya lakshan hai kya?",
+    "ASK_SYMPTOMS": "Kya unhe pet mein dard, tez sar dard, dhundhla dikhna, bleeding, daura, soojan, paani aana, ya bachche ki halchal kam lagna hai?",
+    "confirm_routine": "Dhanyavaad Didi. {label} ka record confirm ho gaya hai. Kya aap kisi aur mahila ka record dena chahti hain?",
+    "confirm_escalate": "Dhanyavaad Didi. {label} ka record confirm ho gaya hai. Screening {level} hai, kripya PHC team se turant sampark karein. Kya aap kisi aur mahila ka record dena chahti hain?",
+    "next_patient": "Theek hai Didi. Ab agle marij ka poora naam aur gaon batayein.",
+    "finish_call": "Dhanyavaad Didi. ASHA-Vani call ab band ho rahi hai. Namaste.",
+    "continue_prompt": "Didi, kya aap kisi aur garbhavati mahila ka record dena chahti hain? Haan ya nahi batayein.",
+    "history_match": "Mujhe {village} ki {name} ka purana record mila hai. Kya yeh wahi patient hain? Haan ya nahi batayein.",
+    "history_yes": "Theek hai. Kya aap unka pichhla visit summary sunna chahti hain? Haan ya nahi batayein.",
+    "history_another": "Theek hai. Ek aur purana record mila: {name}, gaon {village}, pati/guardian {spouse}. Kya yeh wahi patient hain?",
+    "history_no_more": "Theek hai, main ise alag patient ke roop mein darj karungi.",
+    "read_history": "Pichhle visit mein {name} ke liye {details} darj tha. Yeh sirf purana record hai. {prompt}",
+    "read_history_default_prompt": "Ab naye visit ki jaankari confirm karein.",
+    "history_repeat": "Didi, kya aap pichhla visit summary sunna chahti hain? Haan ya nahi batayein.",
+    "correct_generic": "Theek hai Didi. Kaunsi jaankari galat hai? Sahi value dobara batayein.",
+    "correct_spouse": "Theek hai Didi. Pati ka sahi naam batayein.",
+    "correct_patient": "Theek hai Didi. Marij ka sahi naam batayein.",
+    "correct_bp": "Theek hai Didi. Sahi BP ke dono number batayein.",
+    "correct_weeks": "Theek hai Didi. Pregnancy ke sahi hafte batayein.",
+    "correct_hb": "Theek hai Didi. Sahi Hemoglobin (Hb) batayein.",
+    "repeat_bp": "Kripya BP ke dono number dobara batayein.",
+    "repeat_generic": "{message} Kripya sahi value dobara batayein.",
+    "repeat_escalate_prefix": "Screening {level} hai, kripya PHC team se jaldi sampark karein. {prompt}",
+    "collect_confirm_fallback": "Kripya in jaankariyon ko confirm karein.",
+    "readback_empty": "abhi koi visit detail record nahi hui",
+    "readback_changed": "Theek hai, badal diya: {changed_summary}. Screening {level} hai. Kya yeh jaankari sahi hai?",
+    "readback": "Didi, confirm karein: {summary}. Screening {level} hai. Kya yeh jaankari sahi hai?",
+    "language_switched": "Theek hai Didi, ab main Hindi mein baat karungi.",
+    "language_menu": "Bhasha badalne ke liye: Hindi ke liye 1, Tamil ke liye 2, Telugu ke liye 3 dabayein."
+  },
+  "readback_fields": {
+    "patient_name": "marij ka naam {name}",
+    "spouse_name": ", pati ka naam {spouse}",
+    "village": ", gaon {village}",
+    "weeks": "{weeks} hafte",
+    "non_pregnant": "Non-Pregnant Checkup",
+    "bp": "BP {sys} by {dia}",
+    "hb": "Hemoglobin {hb} g/dL",
+    "no_danger_signs": "koi danger lakshan nahi",
+    "symptom_absent": "{label} nahi hai"
+  },
+  "symptom_labels": {
+    "SEVERE_HEADACHE": "tez sar dard",
+    "BLURRED_VISION": "dhundhla dikhna",
+    "EPIGASTRIC_PAIN": "pet mein dard",
+    "CONVULSION": "daura",
+    "UNCONSCIOUS": "behoshi",
+    "VAGINAL_BLEEDING": "bleeding",
+    "LABOUR_PAINS": "prasav dard",
+    "LEAKING_FLUID": "paani aana",
+    "REDUCED_FETAL_MOVEMENT": "bachche ki halchal kam",
+    "SWELLING": "soojan"
+  },
+  "lexicon": {
+    "yes": [
+      "haan", "han", "yes", "correct", "bilkul sahi", "sahi hai", "theek hai",
+      "हाँ", "हां", "बिल्कुल सही", "सही है", "ठीक है"
+    ],
+    "no": [
+      "no", "nahi", "nahin", "galat", "wrong", "incorrect",
+      "नहीं", "गलत"
+    ],
+    "negation_words": ["nahi", "nahin", "no", "not", "नहीं"],
+    "general_denial": [
+      "no symptoms", "koi takleef nahi", "koi lakshan nahi", "kuch nahi", "koi dikkat nahi",
+      "कोई तकलीफ नहीं", "कोई लक्षण नहीं", "कुछ नहीं"
+    ],
+    "symptoms": {
+      "SEVERE_HEADACHE": [
+        "severe headache", "headache", "tez sar dard", "tez sir dard",
+        "sar dard", "sir dard", "sar mein dard", "sir mein dard",
+        "तेज सर दर्द", "तेज सिर दर्द", "सर दर्द", "सिर दर्द", "सिर में दर्द"
+      ],
+      "BLURRED_VISION": [
+        "blurred vision", "blurry vision", "dhundhla", "dhundla",
+        "ankhon ke aage andhera", "दिखाई धुंधला", "धुंधला दिख", "धुंधला"
+      ],
+      "EPIGASTRIC_PAIN": [
+        "epigastric", "upper abdominal pain", "abdominal pain",
+        "stomach pain", "stomach ache", "stomachache",
+        "pet ke upar dard", "pet mein dard", "pet me dard", "pet dard",
+        "kaleje mein dard", "पेट के ऊपर दर्द", "पेट में दर्द", "पेट दर्द"
+      ],
+      "CONVULSION": [
+        "convulsion", "seizure", "fits", "daura", "jhatke", "chamki",
+        "दौरा", "झटके", "चमकी"
+      ],
+      "UNCONSCIOUS": [
+        "unconscious", "behosh", "hosh nahi", "बेहोश", "होश नहीं"
+      ],
+      "VAGINAL_BLEEDING": [
+        "vaginal bleeding", "bleeding", "heavy bleeding", "raktstrav",
+        "khoon aana", "khoon behna", "खून आना", "रक्तस्राव", "ब्लीडिंग"
+      ],
+      "LABOUR_PAINS": [
+        "labour pain", "labor pain", "prasav peeda", "prasav dard",
+        "dard shuru", "प्रसव पीड़ा", "प्रसव दर्द"
+      ],
+      "LEAKING_FLUID": [
+        "leaking fluid", "water broke", "paani nikal", "paani aana",
+        "paani toot", "पानी निकल", "पानी आना", "पानी टूट"
+      ],
+      "REDUCED_FETAL_MOVEMENT": [
+        "reduced fetal movement", "fetal movement kam", "halchal kam",
+        "bachche ki halchal kam", "kicks kam", "हलचल कम", "बच्चे की हलचल कम"
+      ],
+      "SWELLING": [
+        "swelling", "edema", "oedema", "soojan", "sujan",
+        "haath pair mein soojan", "muh par soojan", "सूजन"
+      ]
+    },
+    "keywords": {
+      "spouse": ["pati", "husband", "spouse"],
+      "patient": ["marij", "patient", "patni", "mahila", "aurat", "naam"],
+      "weeks": ["weeks", "week", "hafte", "hafta", "saptah"],
+      "bp": ["bp", "blood pressure"],
+      "hb": ["hb", "hemoglobin", "khoon"],
+      "not_pregnant": [
+        "pregnant nahi", "garbhvati nahi", "garbhini nahi", "not pregnant", "no pregnancy",
+        "postnatal", "post natal", "pnc", "delivery ho gayi", "general checkup", "normal checkup",
+        "गर्भवती नहीं"
+      ]
+    },
+    "numbers": {
+      "dedh sau": "150",
+      "dhedh sau": "150",
+      "डेढ़ सौ": "150",
+      "ek sau pachas": "150",
+      "एक सौ पचास": "150",
+      "ek sau saath": "160",
+      "ek sau sattar": "170",
+      "ek sau assi": "180",
+      "ek sau chalis": "140",
+      "ek sau tees": "130",
+      "ek sau bees": "120",
+      "ek sau das": "110",
+      "pachhanave": "95",
+      "pachhanve": "95",
+      "pachanve": "95",
+      "पचानवे": "95",
+      "nabbe": "90",
+      "pachasi": "85",
+      "assi": "80",
+      "pachattar": "75",
+      "sattar": "70",
+      "saath": "60",
+      "battis": "32",
+      "बत्तीस": "32",
+      "atthais": "28",
+      "chhabbis": "26",
+      "chaubis": "24",
+      "tees": "30",
+      "bees": "20",
+      "sau": "100",
+      "shunya": "0",
+      "शून्य": "0",
+      "zero": "0"
+    },
+    "switch_request": [
+      "hindi mein", "hindi me", "hindi la", "hindi lo", "हिन्दी में", "हिंदी में"
+    ],
+    "is_not_me": [
+      "main nahi hoon", "main nahi hu", "galat didi", "dusri asha", "मैं नहीं हूँ"
+    ]
+  }
+}
+

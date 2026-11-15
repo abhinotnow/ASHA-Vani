@@ -96,3 +96,4 @@ h1, h2, h3 { font-weight: var(--display-weight); line-height: 1; }
 .field label { position: absolute; left: var(--space-md); top: var(--space-xs); font-size: 0.75rem; font-weight: 500; color: var(--color-muted); }
 .num { font-family: var(--font-outlier); font-variant-numeric: tabular-nums; }
 ```
+

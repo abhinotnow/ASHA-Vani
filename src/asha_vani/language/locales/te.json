@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "code": "te",
+    "bcp47": "te-IN",
+    "name_native": "తెలుగు",
+    "name_en": "Telugu",
+    "tts": {
+      "voice": "Suhana",
+      "language": "te-IN",
+      "model": "timbre-v2.5"
+    },
+    "stt": {
+      "language_code": "te-IN"
+    },
+    "transliteration_scheme": "telugu"
+  },
+  "prompts": {
+    "greeting": "నమస్కారం అక్క! ASHA-Vani కు స్వాగతం. మీరు ఏ గ్రామంలో ఉన్నారు, ఏ patient ఇంటి నుండి మాట్లాడుతున్నారు?",
+    "greeting_known_worker": "నమస్కారం {short_name} అక్క ({asha_id})! ASHA-Vani కు స్వాగతం. Patient పూర్తి పేరు మరియు గ్రామం చెప్పండి.",
+    "greet_worker_ask_patient": "సరే {short_name} అక్క ({asha_id}), patient పూర్తి పేరు మరియు గ్రామం చెప్పండి.",
+    "ask_asha_id": "మీ 3-digit ASHA worker ID చెప్పండి.",
+    "ASK_PATIENT_NAME": "అక్క, patient పూర్తి పేరు మరియు గ్రామం చెప్పండి.",
+    "ASK_SPOUSE_NAME": "సరే అక్క, భర్త (husband) పేరు ఏమిటి?",
+    "ASK_WEEKS": "సరే. Pregnancy ఎన్ని weeks అయ్యింది? గర్భవతి కాకపోతే zero అని చెప్పండి.",
+    "ASK_BP": "సరే, వారి BP (blood pressure) ఎంత ఉంది? Systolic మరియు diastolic రెండు నంబర్లు చెప్పండి.",
+    "ASK_BP_NON_PREGNANT": "సరే అక్క, Non-Pregnant checkup నమోదు అయ్యింది. వారి BP (blood pressure) ఎంత ఉంది? Systolic మరియు diastolic రెండు నంబర్లు చెప్పండి.",
+    "ASK_HB": "వారి Hemoglobin (Hb) ఎంత ఉంది, ఏదైనా ఇబ్బంది లేదా లక్షణాలు ఉన్నాయా?",
+    "ASK_SYMPTOMS": "వారికి కడుపు నొప్పి, తీవ్రమైన తలనొప్పి, మసక చూపు, bleeding, ఫిట్స్, వాపు, నీరు కారడం, లేదా బిడ్డ కదలికలు తగ్గడం ఉన్నాయా?",
+    "confirm_routine": "ధన్యవాదాలు అక్క. {label} రికార్డు confirm అయ్యింది. ఇంకో మహిళ వివరాలు ఇవ్వాలా?",
+    "confirm_escalate": "ధన్యవాదాలు అక్క. {label} రికార్డు confirm అయ్యింది. Screening {level} గా ఉంది, వెంటనే PHC టీమ్ ని సంప్రదించండి. ఇంకో మహిళ వివరాలు ఇవ్వాలా?",
+    "next_patient": "సరే అక్క. తర్వాతి patient పూర్తి పేరు మరియు గ్రామం చెప్పండి.",
+    "finish_call": "ధన్యవాదాలు అక్క. ASHA-Vani కాల్ ఇప్పుడు ముగుస్తోంది. నమస్కారం.",
+    "continue_prompt": "అక్క, ఇంకో గర్భిణీ స్త్రీ వివరాలు ఇవ్వాలా? అవును లేదా కాదు అని చెప్పండి.",
+    "history_match": "{village} గ్రామానికి చెందిన {name} పాత రికార్డు దొరికింది. వీరు అదే patient నా? అవును లేదా కాదు అని చెప్పండి.",
+    "history_yes": "సరే. వారి పాత visit summary వినాలనుకుంటున్నారా? అవును లేదా కాదు అని చెప్పండి.",
+    "history_another": "సరే. ఇంకో పాత రికార్డు ఉంది: {name}, గ్రామం {village}, భర్త/సంరక్షకుడు {spouse}. వీరు అదే patient నా?",
+    "history_no_more": "సరే, దీనిని కొత్త patient గా నమోదు చేస్తాను.",
+    "read_history": "గత visit లో {name} కు {details} నమోదైంది. ఇది పాత రికార్డు మాత్రమే. {prompt}",
+    "read_history_default_prompt": "ఇప్పుడు కొత్త visit వివరాలు confirm చేయండి.",
+    "history_repeat": "అక్క, పాత visit summary వినాలనుకుంటున్నారా? అవును లేదా కాదు అని చెప్పండి.",
+    "correct_generic": "సరే అక్క. ఏ వివరం తప్పుగా ఉంది? సరైన విలువ మళ్ళీ చెప్పండి.",
+    "correct_spouse": "సరే అక్క. భర్త సరైన పేరు చెప్పండి.",
+    "correct_patient": "సరే అక్క. Patient సరైన పేరు చెప్పండి.",
+    "correct_bp": "సరే అక్క. సరైన BP రెండు నంబర్లు చెప్పండి.",
+    "correct_weeks": "సరే అక్క. Pregnancy సరైన weeks చెప్పండి.",
+    "correct_hb": "సరే అక్క. సరైన Hemoglobin (Hb) చెప్పండి.",
+    "repeat_bp": "దయచేసి BP రెండు నంబర్లు మళ్ళీ చెప్పండి.",
+    "repeat_generic": "{message} దయచేసి సరైన విలువ మళ్ళీ చెప్పండి.",
+    "repeat_escalate_prefix": "Screening {level} గా ఉంది, వెంటనే PHC టీమ్ ని సంప్రదించండి. {prompt}",
+    "collect_confirm_fallback": "దయచేసి ఈ వివరాలను confirm చేయండి.",
+    "readback_empty": "ఇప్పటివరకు ఏ visit వివరాలు నమోదు కాలేదు",
+    "readback_changed": "సరే, మార్చబడింది: {changed_summary}. Screening {level} గా ఉంది. ఈ వివరాలు సరైనవేనా?",
+    "readback": "అక్క, confirm చేయండి: {summary}. Screening {level} గా ఉంది. ఈ వివరాలు సరైనవేనా?",
+    "language_switched": "సరే అక్క, ఇక తెలుగులో మాట్లాడుతున్నాను.",
+    "language_menu": "భాష మార్చడానికి: Hindi కోసం 1, Tamil కోసం 2, Telugu కోసం 3 నొక్కండి."
+  },
+  "readback_fields": {
+    "patient_name": "patient పేరు {name}",
+    "spouse_name": ", భర్త పేరు {spouse}",
+    "village": ", గ్రామం {village}",
+    "weeks": "{weeks} weeks",
+    "non_pregnant": "Non-Pregnant Checkup",
+    "bp": "BP {sys} by {dia}",
+    "hb": "Hemoglobin {hb} g/dL",
+    "no_danger_signs": "ప్రమాద లక్షణాలు లేవు",
+    "symptom_absent": "{label} లేదు"
+  },
+  "symptom_labels": {
+    "SEVERE_HEADACHE": "తీవ్రమైన తలనొప్పి",
+    "BLURRED_VISION": "మసక చూపు",
+    "EPIGASTRIC_PAIN": "కడుపు నొప్పి",
+    "CONVULSION": "ఫిట్స్",
+    "UNCONSCIOUS": "స్పృహ కోల్పోవడం",
+    "VAGINAL_BLEEDING": "bleeding",
+    "LABOUR_PAINS": "పురిటి నొప్పులు",
+    "LEAKING_FLUID": "నీరు కారడం",
+    "REDUCED_FETAL_MOVEMENT": "బిడ్డ కదలికలు తగ్గడం",
+    "SWELLING": "వాపు"
+  },
+  "lexicon": {
+    "yes": [
+      "avunu", "aunu", "haa", "sare", "yes", "correct", "ok",
+      "అవును", "సరే"
+    ],
+    "no": [
+      "kaadu", "kadu", "ledu", "vaddu", "tappu", "no", "wrong",
+      "కాదు", "లేదు", "వద్దు", "తప్పు"
+    ],
+    "negation_words": ["ledu", "kaadu", "kadu", "no", "not", "లేదు", "కాదు"],
+    "general_denial": [
+      "no symptoms", "emi ledu", "em ledu", "lakshanalu levu", "samasya ledu",
+      "లక్షణాలు లేవు", "ఏమీ లేదు", "సమస్య లేదు"
+    ],
+    "symptoms": {
+      "SEVERE_HEADACHE": [
+        "severe headache", "headache", "tala noppi", "thala noppi", "ekkuva tala noppi",
+        "తలనొప్పి", "తల నొప్పి", "తీవ్రమైన తలనొప్పి"
+      ],
+      "BLURRED_VISION": [
+        "blurred vision", "blurry vision", "masaka chupu", "choopu masaka", "kanlu masaka",
+        "మసక చూపు", "కళ్ళు మసక"
+      ],
+      "EPIGASTRIC_PAIN": [
+        "epigastric", "stomach pain", "kadupu noppi", "potta noppi", "pai kadupu noppi",
+        "కడుపు నొప్పి", "పొట్ట నొప్పి"
+      ],
+      "CONVULSION": [
+        "convulsion", "seizure", "fits", "muracha",
+        "ఫిట్స్", "మూర్ఛ"
+      ],
+      "UNCONSCIOUS": [
+        "unconscious", "spruha ledu", "kallu tirigi", "padipoyindi",
+        "స్పృహ లేదు", "స్పృహ కోల్పోవడం"
+      ],
+      "VAGINAL_BLEEDING": [
+        "vaginal bleeding", "bleeding", "heavy bleeding", "rakta sravam", "raktam",
+        "రక్తస్రావం", "రక్తం", "బ్లీడింగ్"
+      ],
+      "LABOUR_PAINS": [
+        "labour pain", "labor pain", "puriti noppulu", "prasava noppulu",
+        "పురిటి నొప్పులు", "ప్రసవ నొప్పులు"
+      ],
+      "LEAKING_FLUID": [
+        "leaking fluid", "water broke", "neeru karadam", "neellu karutunnayi",
+        "నీరు కారడం", "నీళ్ళు కారుతున్నాయి"
+      ],
+      "REDUCED_FETAL_MOVEMENT": [
+        "reduced fetal movement", "bidda kadalikalu takkuva", "kadalikalu levu", "papa kadalika takkuva",
+        "బిడ్డ కదలికలు తగ్గడం", "కదలికలు తక్కువ"
+      ],
+      "SWELLING": [
+        "swelling", "edema", "oedema", "vaapu", "vapu", "kaallu vaapu",
+        "వాపు", "కాళ్ళు వాపు"
+      ]
+    },
+    "keywords": {
+      "spouse": ["bharta", "husband", "spouse", "భర్త"],
+      "patient": ["patient", "rogi", "peru", "పేరు"],
+      "weeks": ["weeks", "week", "vaaram", "varalu", "వారాలు", "వారం"],
+      "bp": ["bp", "blood pressure", "బీపీ"],
+      "hb": ["hb", "hemoglobin", "raktham", "హీమోగ్లోబిన్", "హెచ్బీ"],
+      "not_pregnant": [
+        "garbhavati kaadu", "pregnant kaadu", "not pregnant",
+        "postnatal", "pnc", "prasavam ayindi", "గర్భవతి కాదు"
+      ]
+    },
+    "numbers": {
+      "noota yaabhai": "150",
+      "noota yabhai": "150",
+      "noota aravai": "160",
+      "noota debbai": "170",
+      "noota enabhai": "180",
+      "noota nalabhai": "140",
+      "noota muppai": "130",
+      "noota iravai": "120",
+      "tombhai": "90",
+      "tombhai aidu": "95",
+      "enabhai": "80",
+      "debbai": "70",
+      "muppai rendu": "32",
+      "iravai enimidi": "28",
+      "sunna": "0",
+      "zero": "0",
+      "నూట యాభై": "150",
+      "నూట అరవై": "160",
+      "తొంభై ఐదు": "95",
+      "తొంభై": "90",
+      "సున్నా": "0"
+    },
+    "switch_request": [
+      "telugu mein", "telugu me", "telugu lo", "telugu la", "తెలుగులో", "తెలుగు"
+    ],
+    "is_not_me": [
+      "nenu kaadu", "nenu kadu", "vere asha", "నేను కాదు"
+    ]
+  }
+}
+

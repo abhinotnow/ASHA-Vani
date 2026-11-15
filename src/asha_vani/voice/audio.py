@@ -277,3 +277,54 @@ def condition_telephone_audio(
     if apply_mulaw:
         audio = mulaw_roundtrip(audio)
     return audio
+
+
+# ---------------------------------------------------------------------------
+# 5. Energy-Based Voice Activity Detector (VAD)
+# ---------------------------------------------------------------------------
+class EnergyVAD:
+    """Voice Activity Detector tracking active speech frames and trailing silence."""
+
+    def __init__(
+        self,
+        energy_threshold: float = 350.0,
+        min_speech_frames: int = 3,         # ~192 ms of speech to trigger SPEECH_START
+        silence_hangover_frames: int = 14,  # ~896 ms of continuous silence to trigger SPEECH_END
+    ) -> None:
+        self.energy_threshold = energy_threshold
+        self.min_speech_frames = min_speech_frames
+        self.silence_hangover_frames = silence_hangover_frames
+        self._speech_frame_count: int = 0
+        self._silence_frame_count: int = 0
+        self.is_speaking: bool = False
+
+    def process_frame(self, pcm16_frame: bytes) -> str | None:
+        """Process 1024-byte PCM16 frame. Returns 'SPEECH_START', 'SPEECH_END', or None."""
+        if len(pcm16_frame) < 2:
+            return None
+        samples = bytes_to_samples(pcm16_frame)
+        if not samples:
+            return None
+        sum_sq = sum(s * s for s in samples)
+        rms = math.sqrt(sum_sq / len(samples))
+
+        if rms >= self.energy_threshold:
+            self._speech_frame_count += 1
+            self._silence_frame_count = 0
+            if not self.is_speaking and self._speech_frame_count >= self.min_speech_frames:
+                self.is_speaking = True
+                return "SPEECH_START"
+        else:
+            self._silence_frame_count += 1
+            if self.is_speaking and self._silence_frame_count >= self.silence_hangover_frames:
+                self.is_speaking = False
+                self._speech_frame_count = 0
+                self._silence_frame_count = 0
+                return "SPEECH_END"
+        return None
+
+    def reset(self) -> None:
+        self._speech_frame_count = 0
+        self._silence_frame_count = 0
+        self.is_speaking = False
+

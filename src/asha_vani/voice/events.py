@@ -20,6 +20,7 @@ class CallEventType(str, Enum):
     CALL_STARTED = "call_started"
     TURN_COMPLETED = "turn_completed"
     CALL_ENDED = "call_ended"
+    LANGUAGE_CHANGED = "language_changed"
 
 
 class CallEvent(ProjectModel):

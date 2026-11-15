@@ -10,6 +10,8 @@ from typing import Any, Protocol
 from pydantic import Field
 
 from asha_vani.graph import build_call_graph
+from asha_vani.language.locale import DEFAULT_LANGUAGE, lexicon, normalize_language_code, t
+from asha_vani.language.registry import AshaWorker, WorkerRegistry
 from asha_vani.schemas import (
     ExtractedVisit,
     PatientReference,
@@ -39,6 +41,8 @@ class TurnOutput(ProjectModel):
     transcript: str
     asha_id: str | None = None
     asha_name: str | None = None
+    language: str = DEFAULT_LANGUAGE
+    language_source: str = "DEFAULT"
     visit_category: str = "MATERNAL_ANC"
     is_pregnant: bool | None = None
     english_summary: str = ""
@@ -55,19 +59,16 @@ class TurnOutput(ProjectModel):
 
 
 class TurnRunner(Protocol):
-    async def run_turn(self, session_id: str, utterance_seq: int, transcript: str) -> TurnOutput: ...
+    async def run_turn(
+        self,
+        session_id: str,
+        utterance_seq: int,
+        transcript: str,
+        *,
+        language: str = DEFAULT_LANGUAGE,
+        language_source: str | None = None,
+    ) -> TurnOutput: ...
 
-
-_ASHA_ROSTER: dict[str, tuple[str, str]] = {
-    "001": ("ASHA-001", "Sunita Kumari (ASHA-001)"),
-    "002": ("ASHA-002", "Meena Yadav (ASHA-002)"),
-    "003": ("ASHA-003", "Rekha Devi (ASHA-003)"),
-    "004": ("ASHA-004", "Savita Sharma (ASHA-004)"),
-    "005": ("ASHA-005", "Geeta Devi (ASHA-005)"),
-    "006": ("ASHA-006", "Kiran Verma (ASHA-006)"),
-    "007": ("ASHA-007", "Asha Kumari (ASHA-007)"),
-    "008": ("ASHA-008", "Usha Devi (ASHA-008)"),
-}
 
 _NON_PREGNANT_PATTERNS = re.compile(
     r"(?:\b(?:pregnant\s+nahi|garbhvati\s+nahi|garbhini\s+nahi|not\s+pregnant|no\s+pregnancy|"
@@ -78,7 +79,12 @@ _NON_PREGNANT_PATTERNS = re.compile(
 )
 
 
-def extract_asha_worker_id(transcript: str, *, expected_action: str | None = None) -> tuple[str | None, str | None]:
+def extract_asha_worker_id(
+    transcript: str,
+    *,
+    expected_action: str | None = None,
+    registry: WorkerRegistry | None = None,
+) -> tuple[str | None, str | None]:
     """Extract ASHA worker ID (e.g. 'ASHA-005' or bare '005' when asked for ASHA ID)."""
     norm = transcript.lower()
     for word, digit in (("zero", "0"), ("shunya", "0"), ("paanch", "5"), ("panch", "5"), ("पांच", "5"), ("पाँच", "5")):
@@ -86,31 +92,51 @@ def extract_asha_worker_id(transcript: str, *, expected_action: str | None = Non
     norm = re.sub(r"\b(\d)\s+(\d)\s+(\d)\b", r"\1\2\3", norm)
 
     explicit = re.search(
-        r"\b(?:asha(?:\s*id|\s*worker|\s*code|\s*number)?|id(?:\s*number)?|आशा(?:\s*आईडी)?)\s*(?:hai|is|:|-)?\s*0*(\d{1,3})\b",
+        r"(?:\b(?:asha(?:\s*id|\s*worker|\s*code|\s*number)?|id(?:\s*number)?)|आशा(?:\s*आईडी)?|ஐடி|ఐడి)\s*(?:hai|is|:|-)?\s*0*(\d{1,4})\b",
         norm,
         re.IGNORECASE,
     )
+    code_str: str | None = None
     if explicit:
-        code = f"{int(explicit.group(1)):03d}"
-        return _ASHA_ROSTER.get(code, (f"ASHA-{code}", f"Registered Worker (ASHA-{code})"))
-
-    if expected_action == "ASK_ASHA_ID":
-        bare = re.search(r"^\s*#?\*?0*(\d{1,3})#?\s*$", norm)
+        num = int(explicit.group(1))
+        code_str = f"{num:03d}" if num < 1000 else str(num)
+    elif expected_action == "ASK_ASHA_ID":
+        bare = re.search(r"^\s*#?\*?0*(\d{1,4})#?\s*$", norm)
         if bare:
-            code = f"{int(bare.group(1)):03d}"
-            return _ASHA_ROSTER.get(code, (f"ASHA-{code}", f"Registered Worker (ASHA-{code})"))
-    return None, None
+            num = int(bare.group(1))
+            code_str = f"{num:03d}" if num < 1000 else str(num)
+
+    if not code_str:
+        return None, None
+    aid = f"ASHA-{code_str}"
+    if registry is not None:
+        worker = registry.by_asha_id(aid)
+        if worker is not None:
+            return worker.asha_id, worker.display_name
+    return aid, f"Registered Worker ({aid})"
 
 
-def detect_non_pregnant_category(transcript: str, *, expected_action: str | None = None) -> tuple[bool | None, str | None]:
+def detect_non_pregnant_category(
+    transcript: str,
+    *,
+    expected_action: str | None = None,
+    language: str = DEFAULT_LANGUAGE,
+) -> tuple[bool | None, str | None]:
     """Detect if the speaker explicitly indicates a non-pregnant / postnatal / general checkup."""
     low = transcript.lower().strip()
+    no_terms = list(lexicon(language).get("no", []))
+    if language != DEFAULT_LANGUAGE:
+        no_terms.extend(lexicon(DEFAULT_LANGUAGE).get("no", []))
+    no_alt = "|".join(re.escape(w) for w in dict.fromkeys(no_terms) if w)
+    np_terms = list(lexicon(language).get("keywords", {}).get("not_pregnant", []))
+    np_matched = any(t_word in low for t_word in np_terms)
+
     is_weeks_zero_or_no = bool(
         expected_action == "ASK_WEEKS"
-        and re.match(r"^\s*(?:0|zero|shunya|nahi|nahin|no)\b|^\s*(?:नहीं|शून्य)\b", low, re.IGNORECASE)
+        and re.match(rf"^\s*(?:0|zero|shunya|poojyam|sunna|{no_alt})\b", low, re.IGNORECASE)
     )
-    if _NON_PREGNANT_PATTERNS.search(low) or re.match(r"^\s*0\s*#?\s*$", low) or is_weeks_zero_or_no:
-        if any(w in low for w in ("postnatal", "post natal", "pnc", "delivery")):
+    if _NON_PREGNANT_PATTERNS.search(low) or np_matched or re.match(r"^\s*0\s*#?\s*$", low) or is_weeks_zero_or_no:
+        if any(w in low for w in ("postnatal", "post natal", "pnc", "delivery", "prasavam")):
             return False, "POSTNATAL_PNC"
         if any(w in low for w in ("bukhar", "fever", "infection")):
             return False, "FEVER_INFECTION"
@@ -118,17 +144,24 @@ def detect_non_pregnant_category(transcript: str, *, expected_action: str | None
     return None, None
 
 
-def _normalize_dtmf_for_graph(transcript: str, expected_action: str | None) -> str:
+def _normalize_dtmf_for_graph(
+    transcript: str,
+    expected_action: str | None,
+    *,
+    language: str = DEFAULT_LANGUAGE,
+) -> str:
     """Convert DTMF keypad shorthands ('150*95', '1' on confirm) into phrases that `extract_turn` understands."""
     cleaned = transcript.strip()
     bp_dtmf = re.match(r"^\s*(\d{2,3})\s*[*#]\s*(\d{2,3})#?\s*$", cleaned)
     if bp_dtmf:
         return f"BP {bp_dtmf.group(1)} by {bp_dtmf.group(2)}"
-    if expected_action in ("CONFIRM_VALUES", "ASK_ANOTHER_PATIENT"):
+    if expected_action in ("CONFIRM_VALUES", "ASK_ANOTHER_PATIENT", "CONFIRM_PATIENT_MATCH", "ASK_READ_PRIOR_RECORD"):
+        yes_list = lexicon(language).get("yes") or ["Haan"]
+        no_list = lexicon(language).get("no") or ["Nahi"]
         if re.match(r"^\s*1#?\s*$", cleaned):
-            return "Haan sahi hai"
+            return yes_list[0]
         if re.match(r"^\s*2#?\s*$", cleaned):
-            return "Nahi galat hai"
+            return no_list[0]
     return transcript
 
 
@@ -173,30 +206,65 @@ class LangGraphTurnRunner:
         *,
         require_full_checklist: bool = False,
         history_lookup: Any | None = None,
+        registry: WorkerRegistry | None = None,
     ) -> None:
         self._graph = graph or build_call_graph(
             require_full_checklist=require_full_checklist,
             history_lookup=history_lookup,
         )
         self.require_full_checklist = require_full_checklist
+        self.registry = registry or WorkerRegistry()
         self._asha_workers: dict[str, tuple[str, str]] = {}
         self._pregnancy_state: dict[str, tuple[bool | None, str]] = {}
         self._last_action: dict[str, str] = {}
 
-    async def run_turn(self, session_id: str, utterance_seq: int, transcript: str) -> TurnOutput:
+    def seed_worker(self, session_id: str, worker: AshaWorker | None) -> None:
+        """Pre-seed a registered ASHA worker on call connect so the ID prompt is skipped."""
+        if worker is None:
+            return
+        self._asha_workers[session_id] = (worker.asha_id, worker.display_name)
+        if self.require_full_checklist:
+            self._last_action[session_id] = "ASK_PATIENT_NAME"
+
+    def clear_worker(self, session_id: str) -> None:
+        """Clear pre-seeded worker (e.g. when caller says 'main nahi hoon' / presses 0)."""
+        self._asha_workers.pop(session_id, None)
+        self._last_action[session_id] = "ASK_ASHA_ID"
+
+    def get_last_action(self, session_id: str) -> str | None:
+        return self._last_action.get(session_id)
+
+    async def run_turn(
+        self,
+        session_id: str,
+        utterance_seq: int,
+        transcript: str,
+        *,
+        language: str = DEFAULT_LANGUAGE,
+        language_source: str | None = None,
+    ) -> TurnOutput:
+        lang = normalize_language_code(language)
         expected_action = self._last_action.get(
             session_id,
             "ASK_ASHA_ID" if self.require_full_checklist else None,
         )
 
         # 1. Detect ASHA Worker ID ("ASHA ID 005" or bare "005" on initial turn)
-        found_id, found_name = extract_asha_worker_id(transcript, expected_action=expected_action)
+        found_id, found_name = extract_asha_worker_id(
+            transcript,
+            expected_action=expected_action,
+            registry=self.registry,
+        )
         if found_id and found_name:
             self._asha_workers[session_id] = (found_id, found_name)
         asha_id, asha_name = self._asha_workers.get(session_id, (None, None))
 
         # 2. Detect Non-Pregnant category ("pregnant nahi hai", "0 weeks", "postnatal", etc.)
-        np_flag, np_cat = detect_non_pregnant_category(transcript, expected_action=expected_action)
+        np_flag, np_cat = detect_non_pregnant_category(
+            transcript,
+            expected_action=expected_action,
+            language=lang,
+        )
         cur_preg, cur_cat = self._pregnancy_state.get(session_id, (None, "MATERNAL_ANC"))
         if np_flag is False and np_cat:
             cur_preg = False
@@ -215,8 +283,12 @@ class LangGraphTurnRunner:
             < 3
         )
 
-        graph_utterance = "" if is_pure_asha_id_turn else _normalize_dtmf_for_graph(transcript, expected_action)
-        invoke_payload: dict[str, Any] = {"utterance": graph_utterance}
+        graph_utterance = (
+            ""
+            if is_pure_asha_id_turn
+            else _normalize_dtmf_for_graph(transcript, expected_action, language=lang)
+        )
+        invoke_payload: dict[str, Any] = {"utterance": graph_utterance, "language": lang}
         if cur_preg is False:
             invoke_payload["is_pregnant"] = False
 
@@ -252,7 +324,7 @@ class LangGraphTurnRunner:
 
         if is_pure_asha_id_turn and asha_name and asha_id and next_action == "ASK_PATIENT_NAME":
             short_name = asha_name.split("(")[0].strip()
-            reply_text = f"Ji {short_name} Didi ({asha_id}), marij (patient) ka poora naam aur gaon batayein."
+            reply_text = t(lang, "greet_worker_ask_patient", short_name=short_name, asha_id=asha_id)
 
         self._last_action[session_id] = next_action
         eng_summary = _build_english_summary(
@@ -275,6 +347,8 @@ class LangGraphTurnRunner:
             transcript=transcript,
             asha_id=asha_id,
             asha_name=asha_name,
+            language=lang,
+            language_source=language_source or "DEFAULT",
             visit_category=cur_cat,
             is_pregnant=cur_preg,
             english_summary=eng_summary,

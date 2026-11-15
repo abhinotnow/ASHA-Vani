@@ -22,4 +22,6 @@ graphify-out/
 brag-output/
 brag-output-*/
 .local_register_cache.json
+data/asha_workers.local.json
+
 

@@ -29,7 +29,7 @@
   \begin{@twocolumnfalse}
     \begin{center}
       {\LARGE\bfseries ASHA-Vani: Voice-First Clinical Triage \& Early-Warning Register}\\[3pt]
-      {\small\color{muted}\textbf{Powered by Gnani Prisma STT \& Gnani Timbre v2.5 TTS} $\cdot$ Deterministic Maternal \& Rural Health Decision Support}\\[4pt]
+      {\small\color{muted}\textbf{Powered by Gnani Prisma STT, Gnani Evon v3.3 (30B-A3B) \& Gnani Timbre v2.5 TTS} $\cdot$ Deterministic Rural Health Decision Support}\\[4pt]
       \rule{\textwidth}{0.8pt}
     \end{center}
     \vspace{-4pt}
@@ -40,21 +40,20 @@
 India's 1M+ Accredited Social Health Activists (\textbf{ASHAs}) conduct doorstep maternal and general health visits across rural villages, often operating on basic 2G feature phones in high-noise environments. Vital readings (blood pressure, hemoglobin, gestational age, danger signs) are written into paper registers and batch-entered days later at the Primary Health Centre (\textbf{PHC}). By the time severe preeclampsia ($\text{BP} \ge 160/110\text{ mmHg}$) or critical anemia ($\text{Hb} < 5.0\text{ g/dL}$) is reviewed by a Medical Officer, the window for early intervention has often closed.
 
 \section{The Solution: ASHA-Vani}
-\textbf{ASHA-Vani} turns any basic feature phone or PSTN line into a real-time, voice-verified clinical register and early-warning system. An ASHA worker dials in (via an Exotel PSTN bridge or the built-in 8\,kHz Nokia simulator) and speaks naturally in \textbf{Hindi or Hinglish}. Within milliseconds per turn, ASHA-Vani:
+Built from the ground up for \textbf{Pan-India maternal health}, \textbf{ASHA-Vani} turns any basic feature phone or PSTN line into a multilingual, voice-verified clinical register and early-warning system. An ASHA worker dials in (via Exotel PSTN or the built-in 8\,kHz Nokia simulator) and speaks naturally in \textbf{Hindi, Tamil, or Telugu}—backed by a drop-in locale architecture ready to scale across \textbf{all 10 Gnani Prisma Indian languages} (\texttt{hi-IN}, \texttt{en-IN}, \texttt{ta-IN}, \texttt{te-IN}, \texttt{kn-IN}, \texttt{ml-IN}, \texttt{mr-IN}, \texttt{bn-IN}, \texttt{gu-IN}, \texttt{pa-IN}) with zero changes to core clinical logic:
 \begin{itemize}
-  \item Streams 8\,kHz telephone audio through \textbf{Gnani Prisma STT} to transcribe code-mixed Hindi/Hinglish and Devanagari numerals.
-  \item Extracts structured clinical fields into a stateful \textbf{7-step LangGraph intake} (\texttt{CallState}) using Groq Llama 3.3 70B (with 8B/deterministic regex fallback).
-  \item Enforces \textbf{hard physiological bounds} and runs a \textbf{deterministic clinical rule engine (\texttt{R1--R8})}.
-  \item Speaks a \textbf{digit-by-digit Hindi/Hinglish readback} via \textbf{Gnani Timbre v2.5 TTS} and commits the record as \texttt{VERIFIED} only after the ASHA confirms.
-  \item Streams turn-by-turn updates to the \textbf{PHC Clinical Register Console} for 1-click Medical Officer home dispatch (\texttt{108} Ambulance, ANM Mobile, or Home Follow-up).
+  \item \textbf{Automatic Worker \& Language Routing:} Caller ID lookup against Supabase \texttt{asha\_workers} / \texttt{asha\_worker\_phones} (with offline JSON fallback) greets known ASHAs in their native language immediately; unknown callers get a bilingual greeting, \textbf{Prisma \texttt{indic-auto}} + script detection, and \texttt{pending\_phone\_links} queueing, plus anytime mid-call switching via \textbf{keypad \texttt{9}}.
+  \item \textbf{Multilingual STT \& English Register Normalization:} Streams 8\,kHz audio through \textbf{Gnani Prisma STT} across regional languages and normalizes all patient/village names to \textbf{English Roman Title Case} for PHC Medical Officers.
+  \item \textbf{Stateful Extraction \& Deterministic Triage:} Redacts phone/Aadhaar PII pre-LLM, extracts fields into a \textbf{7-step LangGraph intake} (\texttt{CallState}) via \textbf{Gnani Evon v3.3 (\texttt{30B-A3B})} with \texttt{enable\_thinking=False} (Groq Llama 3.3 / regex failover), enforces \textbf{hard physiological bounds}, and runs \textbf{deterministic rules (\texttt{R1--R8})}.
+  \item \textbf{Native Readback \& PHC Dispatch:} Speaks a \textbf{digit-by-digit confirm-back} in the active language via \textbf{Gnani Timbre v2.5 TTS}, marks the record \texttt{VERIFIED} on confirmation, and streams updates for 1-click dispatch (\texttt{108}, ANM, or Home Follow-up).
 \end{itemize}
 
 \section{Core Gnani.ai Voice Integration}
 \begin{itemize}
-  \item \textbf{8\,kHz Telephony Conditioning (\texttt{voice/audio.py}):} Incoming audio is resampled to 8\,kHz mono PCM16, band-pass filtered to PSTN telephone band ($300\text{--}3400\text{ Hz}$), $\mu$-law companded, and sliced into exact \textbf{1024-byte (64\,ms)} frames. Includes calibrated SNR field-noise injection ($15\text{ dB}$ and $5\text{ dB}$) to validate rural acoustic resilience.
-  \item \textbf{Gnani Prisma Streaming STT (\texttt{voice/stt.py}):} Bi-directional WebSocket streaming with dual End-of-Utterance (\textbf{EOU}) detection—triggering on either a $\sim 1.2\text{ s}$ silence window or the trailing radio keyword \texttt{``over''} / \texttt{``ओवर''} (automatically stripped prior to extraction). Supports DTMF keypad fallback (\texttt{0--9, *, \#}) when voice conditions are extreme.
-  \item \textbf{Gnani Timbre v2.5 TTS (\texttt{voice/tts.py}):} Synthesizes natural Hindi/Hinglish prompts (\texttt{Poorvi} / \texttt{Nalini} voices) at 8\,kHz PCM/WAV. Uses an in-memory fixed-script cache so recurring prompts and repeat requests incur zero redundant synthesis latency or API cost.
-  \item \textbf{Half-Duplex Anti-Echo Gate (\texttt{voice/session.py}):} Drops all incoming microphone frames while Timbre TTS is playing plus a strict \textbf{200\,ms acoustic tail guard} after playback finishes, preventing speaker-to-mic self-triggering on loudspeaker phones.
+  \item \textbf{8\,kHz Telephony Conditioning (\texttt{voice/audio.py}):} Resamples to 8\,kHz mono PCM16, band-pass filters ($300\text{--}3400\text{ Hz}$), $\mu$-law compands, and slices into exact \textbf{1024-byte (64\,ms)} frames with calibrated SNR noise injection ($15\text{ dB}$ and $5\text{ dB}$).
+  \item \textbf{Gnani Prisma Streaming STT (\texttt{voice/stt.py}):} Bi-directional WebSocket streaming with \texttt{indic-auto} detection, dual End-of-Utterance (\textbf{EOU}) detection ($\sim 1.2\text{ s}$ silence or trailing \texttt{``over''}), and DTMF keypad fallback (\texttt{0--9, *, \#}).
+  \item \textbf{Gnani Timbre v2.5 TTS (\texttt{voice/tts.py}):} Synthesizes native prompts at 8\,kHz PCM/WAV (\texttt{Poorvi}/\texttt{Nalini} Hindi, \texttt{Asmita} Tamil, \texttt{Suhana} Telugu) using an in-memory fixed-script cache for zero redundant latency or API cost.
+  \item \textbf{Half-Duplex Anti-Echo Gate (\texttt{voice/session.py}):} Drops incoming mic frames while TTS plays plus a strict \textbf{200\,ms acoustic tail guard}, preventing loudspeaker echo loops.
 \end{itemize}
 
 \section{Clinical Safety Architecture}
@@ -85,9 +84,14 @@ ASHA-Vani is strictly a \textbf{decision-support and early-warning pipeline}, ne
 
 \section{System Verification \& Live Workspace}
 \begin{itemize}
-  \item \textbf{69 Automated Pytest Suites Passing:} Covers hard/soft validation boundaries, all \texttt{R1--R8} triage rules, Devanagari/Hinglish extraction, 1024-byte $\mu$-law framing, 200\,ms half-duplex gating, and multi-turn LangGraph confirmation recovery.
-  \item \textbf{Dual Live Workspaces + Supabase Persistence:} Includes the PHC Clinical Register Console + Nokia 2G Simulator (\texttt{/simulator} and Hallmark Furrow edition at \texttt{/furrow}) with live Exotel PSTN line mode and Supabase event recovery.
+  \item \textbf{100 Automated Pytest Suites Passing:} Covers hard/soft validation boundaries, \texttt{R1--R8} triage rules, Evon v3.3/Groq extraction \& PII redaction, multilingual routing (\texttt{hi}/\texttt{ta}/\texttt{te}), caller-ID worker routing, 1024-byte $\mu$-law framing, 200\,ms half-duplex gating, and multi-turn LangGraph confirmation recovery.
+  \item \textbf{Dual Live Workspaces + Supabase Persistence:} Includes the PHC Clinical Register Console + Nokia 2G Simulator (\texttt{/simulator} and Hallmark Furrow edition at \texttt{/furrow}) with live Exotel PSTN line mode, \texttt{asha\_workers} registry routing, and Supabase event recovery.
 \end{itemize}
+
+\vfill
+\rule{\columnwidth}{0.5pt}\\
+{\scriptsize\color{muted}\textbf{Built with Gnani.ai} (Prisma STT $\cdot$ Evon v3.3 $\cdot$ Timbre v2.5 TTS)\\
+\texttt{\#GreatIndianAIInternshipChallenge \#GreatIndianInternship \#GnaniAI \#BuildForIndia \#AIForStudents}}
 
 \end{document}
 

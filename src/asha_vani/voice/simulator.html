@@ -1422,7 +1422,16 @@
       <div class="nokia-section">
         <div class="dock-header">
           <span class="dock-title">ASHA Handset</span>
-          <span class="dock-badge">8kHz PCM · DTMF · SIM</span>
+          <span class="dock-badge" id="handsetLangBadge">8kHz PCM · HI · SIM</span>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <select id="callerSelect" title="Simulate incoming caller phone / worker" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; background: var(--surface-alt); color: var(--text);">
+            <option value="+919900000001">Sunita Kumari (ASHA-001 · HI)</option>
+            <option value="+919900000101">Lakshmi Murugan (ASHA-101 · TA)</option>
+            <option value="+919900000201">Padma Reddy (ASHA-201 · TE)</option>
+            <option value="+919988776655">Unknown Number (Auto-Detect)</option>
+          </select>
         </div>
 
         <div class="nokia-wrap">
@@ -1458,6 +1467,7 @@
 
                 <div class="lcd-bottom">
                   <span id="lcdDuplex">MIC IDLE</span>
+                  <span id="lcdLangTag">HI · REG</span>
                   <span id="lcdNoiseTag">CLEAN</span>
                 </div>
               </div>
@@ -1499,7 +1509,7 @@
               <button class="key-num" data-key="6">6<span>mno</span></button>
               <button class="key-num" data-key="7">7<span>pqrs</span></button>
               <button class="key-num" data-key="8">8<span>tuv</span></button>
-              <button class="key-num" data-key="9">9<span>wxyz</span></button>
+              <button class="key-num" data-key="9" title="Press 9 to switch language (HI/TA/TE)">9<span>lang</span></button>
               <button class="key-num" data-key="*">*<span>/ .</span></button>
               <button class="key-num" data-key="0">0<span>non-p</span></button>
               <button class="key-num" data-key="#">#<span>send</span></button>
@@ -1858,7 +1868,7 @@
             </td>
             <td>
               <div class="patient-cell">
-                <span class="mono-val" style="font-size: 11.5px;">${v.ashaId || "ASHA-001"}</span>
+                <span class="mono-val" style="font-size: 11.5px;">${v.ashaId || "ASHA-001"} <span class="category-chip" style="font-size:10px; padding:1px 5px;" title="${v.languageSource || 'DEFAULT'}">${(v.language || "hi").toUpperCase()}</span></span>
                 <span class="patient-sub">${v.asha.replace(/\(.*\)/, "").trim()}</span>
               </div>
             </td>
@@ -2165,7 +2175,45 @@
     const lcdStatus = document.getElementById("lcdStatus");
     const lcdSub = document.getElementById("lcdSub");
     const lcdDuplex = document.getElementById("lcdDuplex");
+    const lcdLangTag = document.getElementById("lcdLangTag");
+    const handsetLangBadge = document.getElementById("handsetLangBadge");
+    const callerSelect = document.getElementById("callerSelect");
     const lcdTimer = document.getElementById("lcdTimer");
+
+    let activeCallLanguage = "hi";
+    let activeCallLanguageSource = "DEFAULT";
+
+    function updateLanguageBadges(lang, source) {
+      activeCallLanguage = (lang || "hi").toLowerCase();
+      activeCallLanguageSource = source || "DEFAULT";
+      const shortSrc = activeCallLanguageSource === "REGISTERED" ? "REG" : (activeCallLanguageSource === "AUTO_DETECTED" ? "AUTO" : (activeCallLanguageSource === "SWITCHED" ? "SW" : "DEF"));
+      if (lcdLangTag) lcdLangTag.textContent = `${activeCallLanguage.toUpperCase()} · ${shortSrc}`;
+      if (handsetLangBadge) handsetLangBadge.textContent = `8kHz PCM · ${activeCallLanguage.toUpperCase()} · SIM`;
+    }
+
+    async function loadWorkerDirectory() {
+      if (location.protocol === "file:" || !callerSelect) return;
+      try {
+        const res = await fetch("/api/workers");
+        if (!res.ok) return;
+        const data = await res.json();
+        const workers = data.workers || [];
+        if (!workers.length) return;
+        callerSelect.innerHTML = "";
+        for (const w of workers) {
+          const opt = document.createElement("option");
+          opt.value = w.sim_caller || "";
+          opt.dataset.workerId = w.asha_id;
+          opt.textContent = `${w.full_name} (${w.asha_id} · ${(w.language || "hi").toUpperCase()}) ${w.phone_masked || ""}`;
+          callerSelect.appendChild(opt);
+        }
+        const unk = document.createElement("option");
+        unk.value = "+919988776655";
+        unk.textContent = "Unknown Number (+91 99•••••6655 · Auto-Detect)";
+        callerSelect.appendChild(unk);
+      } catch (_) {}
+    }
+    loadWorkerDirectory();
 
     let callWs = null;
     let consoleWs = null;
@@ -2200,7 +2248,11 @@
     async function startLiveMicrophone() {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone capture is unavailable");
       micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false } });
-      micContext = new AudioContext({ sampleRate: 8000 });
+      try {
+        micContext = new AudioContext({ sampleRate: 8000 });
+      } catch (_) {
+        micContext = new AudioContext();
+      }
       await micContext.resume();
       playbackContext = micContext;
       const source = micContext.createMediaStreamSource(micStream);
@@ -2303,8 +2355,12 @@
             timestamp: row.occurred_at,
             payload: row.payload || {}
           };
-          if (event.event_type === "call_started") {
-            ensureLiveVisitStarted(event.session_id, event.timestamp);
+          if (event.event_type === "language_changed" && event.payload) {
+            for (const visit of visits.filter(v => v.sessionId === event.session_id || v.id === `live-${event.session_id}`)) {
+              visit.language = event.payload.language || visit.language;
+              visit.languageSource = event.payload.language_source || visit.languageSource;
+            }
+            renderTable();
           } else if (event.event_type === "turn_completed") {
             applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
           } else if (event.event_type === "call_ended") {
@@ -2335,7 +2391,13 @@
         try {
           const event = JSON.parse(ev.data);
           if (event.event_type === "call_started") {
-            ensureLiveVisitStarted(event.session_id, event.timestamp);
+            ensureLiveVisitStarted(event.session_id, event.timestamp, event.payload);
+          } else if (event.event_type === "language_changed" && event.payload) {
+            for (const visit of visits.filter(v => v.sessionId === event.session_id || v.id === `live-${event.session_id}`)) {
+              visit.language = event.payload.language || visit.language;
+              visit.languageSource = event.payload.language_source || visit.languageSource;
+            }
+            renderTable();
           } else if (event.event_type === "turn_completed") {
             applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
           } else if (event.event_type === "call_ended") {
@@ -2363,7 +2425,7 @@
       };
     }
 
-    function ensureLiveVisitStarted(sessionId, eventIsoTime = null) {
+    function ensureLiveVisitStarted(sessionId, eventIsoTime = null, payload = {}) {
       if (!sessionId) return;
       const vid = `live-${sessionId}-1`;
       let visit = visits.find(v => v.id === vid || v.id === `live-${sessionId}`);
@@ -2376,7 +2438,7 @@
           patientId: null,
           isLive: true,
           recordedAt: formattedTime,
-          whatHappened: "Call Connected -> Asking for ASHA Worker ID",
+          whatHappened: payload.asha_id ? `Call Connected -> ${payload.asha_name || payload.asha_id}` : "Call Connected -> Asking for ASHA Worker ID",
           name: "Listening for Patient...",
           spouse: "Pending...",
           age: "—",
@@ -2384,8 +2446,10 @@
           isPregnant: null,
           village: "Rampur",
           tola: "—",
-          ashaId: null,
-          asha: "Identifying ASHA ID...",
+          ashaId: payload.asha_id || null,
+          asha: payload.asha_name || "Identifying ASHA ID...",
+          language: payload.language || "hi",
+          languageSource: payload.language_source || "DEFAULT",
           weeks: null,
           bp_sys: null,
           bp_dia: null,
@@ -2457,6 +2521,8 @@
           tola: patient.tola || "—",
           ashaId: payload.asha_id || null,
           asha: payload.asha_name || "Identifying ASHA...",
+          language: payload.language || "hi",
+          languageSource: payload.language_source || "DEFAULT",
           weeks: vals.gestational_weeks,
           bp_sys: vals.bp_systolic,
           bp_dia: vals.bp_diastolic,
@@ -2475,6 +2541,8 @@
         visit.whatHappened = englishSum;
         if (payload.asha_id) visit.ashaId = payload.asha_id;
         if (payload.asha_name) visit.asha = payload.asha_name;
+        if (payload.language) visit.language = payload.language;
+        if (payload.language_source) visit.languageSource = payload.language_source;
         if (payload.visit_category) visit.category = payload.visit_category;
         if (payload.is_pregnant !== undefined && payload.is_pregnant !== null) visit.isPregnant = payload.is_pregnant;
         if (patient.full_name) visit.name = patient.full_name;
@@ -2554,7 +2622,7 @@
       lcdSub.textContent = `ASHA-Vani: "${text}"`;
 
       if (location.protocol !== "file:") {
-        fetch(`/api/tts?text=${encodeURIComponent(text)}`)
+        fetch(`/api/tts?text=${encodeURIComponent(text)}&locale_code=${encodeURIComponent(activeCallLanguage || "hi")}`)
           .then(res => {
             if (res.status === 200) return res.blob();
             return null;
@@ -2605,10 +2673,11 @@
           stt_latency_ms: 135
         }));
       } else if (location.protocol !== "file:") {
+        const selectedCaller = callerSelect?.value || "+919900000001";
         fetch("/api/turn", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: activeSessionId, transcript: cleaned })
+          body: JSON.stringify({ session_id: activeSessionId, caller: selectedCaller, transcript: cleaned })
         })
           .then(r => r.json())
           .then(res => {
@@ -2640,7 +2709,11 @@
 
       if (location.protocol !== "file:") {
         const proto = location.protocol === "https:" ? "wss:" : "ws:";
-        callWs = new WebSocket(`${proto}//${location.host}/ws/call`);
+        const selectedOpt = callerSelect?.selectedOptions?.[0];
+        const params = new URLSearchParams();
+        if (callerSelect?.value) params.set("caller", callerSelect.value);
+        else if (selectedOpt?.dataset?.workerId) params.set("worker_id", selectedOpt.dataset.workerId);
+        callWs = new WebSocket(`${proto}//${location.host}/ws/call?${params.toString()}`);
         callWs.binaryType = "blob";
         callWs.onmessage = (ev) => {
           if (typeof ev.data !== "string") {
@@ -2651,7 +2724,10 @@
           if (msg.type === "call_started") {
             activeSessionId = msg.session_id;
             pendingGreeting = msg.greeting_text || "";
-            ensureLiveVisitStarted(msg.session_id);
+            updateLanguageBadges(msg.language, msg.language_source);
+            ensureLiveVisitStarted(msg.session_id, null, msg);
+          } else if (msg.type === "language_changed") {
+            updateLanguageBadges(msg.language, msg.language_source);
           } else if (msg.type === "turn_reply") {
             if (msg.turn) {
               applyLiveBackendTurn(msg.session_id || activeSessionId, msg.turn);

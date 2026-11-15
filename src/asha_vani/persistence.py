@@ -122,12 +122,23 @@ class SupabaseEventSink:
                 0,
                 {
                     "session_id": event.session_id,
-                    "caller": payload.get("caller"),
+                    "caller": payload.get("caller_masked") or payload.get("caller"),
                     "source": payload.get("source", "BROWSER_SIM"),
+                    "asha_id": payload.get("asha_id"),
+                    "language": payload.get("language", "hi"),
+                    "language_source": payload.get("language_source", "DEFAULT"),
                     "is_simulated": event.is_simulated,
                     "started_at": event.timestamp,
                 },
             )
+        elif event.event_type is CallEventType.LANGUAGE_CHANGED:
+            for c in self._cached_register["calls"]:
+                if c.get("session_id") == event.session_id:
+                    c["language"] = payload.get("language", c.get("language"))
+                    c["language_source"] = payload.get("language_source", c.get("language_source"))
+                    if payload.get("asha_id"):
+                        c["asha_id"] = payload["asha_id"]
+                    break
         elif event.event_type is CallEventType.TURN_COMPLETED:
             visit_number = int(payload.get("visit_number", 1))
             row = {
@@ -162,11 +173,22 @@ class SupabaseEventSink:
                     "session_id": event.session_id,
                     "caller": payload.get("caller"),
                     "source": payload.get("source", "BROWSER_SIM"),
+                    "asha_id": payload.get("asha_id"),
+                    "language": payload.get("language", "hi"),
+                    "language_source": payload.get("language_source", "DEFAULT"),
                     "is_simulated": event.is_simulated,
                     "started_at": event.timestamp,
                 },
                 on_conflict="session_id",
             ).execute()
+        elif event.event_type is CallEventType.LANGUAGE_CHANGED:
+            update_data: dict[str, Any] = {
+                "language": payload.get("language"),
+                "language_source": payload.get("language_source"),
+            }
+            if payload.get("asha_id"):
+                update_data["asha_id"] = payload["asha_id"]
+            self._client.table("calls").update(update_data).eq("session_id", event.session_id).execute()
         elif event.event_type is CallEventType.TURN_COMPLETED:
             visit_number = int(payload.get("visit_number", 1))
             patient = payload.get("patient", {})

@@ -1452,24 +1452,38 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
 
         <!-- Mode 1: Minimalist Furrow Field Handset -->
         <div class="nokia-pane" id="nokiaPane">
+          <div style="margin-bottom: var(--space-xs); display: flex; flex-direction: column; gap: var(--space-2xs);">
+            <select id="callerSelect" class="filter-select" title="Simulate incoming caller phone / worker" style="width: 100%; height: 34px; font-size: var(--text-xs); background: var(--color-paper-2); border-color: var(--color-rule);">
+              <option value="+919988776655" selected>🌐 Auto-Detect (Hindi / Tamil / Telugu · Unknown Caller)</option>
+              <option value="+919900000001">Sunita Kumari (ASHA-001 · HI)</option>
+              <option value="+919900000101">Lakshmi Murugan (ASHA-101 · TA)</option>
+              <option value="+919900000201">Padma Reddy (ASHA-201 · TE)</option>
+            </select>
+            <div style="display: flex; gap: var(--space-2xs);" id="quickLangChips">
+              <button class="seg-tab active" type="button" data-lang="auto" style="font-size: 11px; padding: 2px 8px; border: 1px solid var(--color-rule); border-radius: 999px;">🌐 Auto</button>
+              <button class="seg-tab" type="button" data-lang="hi" style="font-size: 11px; padding: 2px 8px; border: 1px solid var(--color-rule); border-radius: 999px;">हिन्दी</button>
+              <button class="seg-tab" type="button" data-lang="ta" style="font-size: 11px; padding: 2px 8px; border: 1px solid var(--color-rule); border-radius: 999px;">தமிழ்</button>
+              <button class="seg-tab" type="button" data-lang="te" style="font-size: 11px; padding: 2px 8px; border: 1px solid var(--color-rule); border-radius: 999px;">తెలుగు</button>
+            </div>
+          </div>
           <div class="handset-card">
             <!-- Dark Ink LCD Header -->
             <div class="nokia-lcd" id="nokiaLcd">
               <div class="lcd-top">
-                <span>Field 2G (SIM)</span>
+                <span id="handsetLangBadge">AUTO · DEF</span>
                 <span class="num" id="lcdTimer">00:00</span>
                 <span id="lcdNoiseTag">Clean</span>
               </div>
 
               <div>
-                <div class="lcd-status" id="lcdStatus">Ready to dial</div>
-                <div class="lcd-sub" id="lcdSub">Press call to start voice intake or dial keypad</div>
+                <div class="lcd-status" id="lcdStatus">Standby · Ready to call</div>
+                <div class="lcd-sub" id="lcdSub">Press CALL to connect line</div>
                 <div class="lcd-dtmf" id="lcdDtmf">Keypad: </div>
               </div>
 
               <div class="lcd-bottom">
                 <span id="lcdDuplex">Mic idle</span>
-                <span class="num">8 kHz PCM</span>
+                <span class="num" id="lcdVuText">Mic: idle</span>
               </div>
             </div>
 
@@ -1500,7 +1514,7 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
                 <button class="key-num" type="button" data-digit="6">6<span>mno</span></button>
                 <button class="key-num" type="button" data-digit="7">7<span>pqrs</span></button>
                 <button class="key-num" type="button" data-digit="8">8<span>tuv</span></button>
-                <button class="key-num" type="button" data-digit="9">9<span>wxyz</span></button>
+                <button class="key-num" type="button" data-digit="9" title="Press 9 to switch language (HI/TA/TE)">9<span>lang</span></button>
                 <button class="key-num" type="button" data-digit="*">*<span>clear</span></button>
                 <button class="key-num" type="button" data-digit="0">0<span>+</span></button>
                 <button class="key-num" type="button" data-digit="#">#<span>send</span></button>
@@ -1869,12 +1883,13 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       const audioEl = document.getElementById("sheetCallAudio");
       const dlEl = document.getElementById("sheetAudioDownload");
       const metaEl = document.getElementById("sheetAudioMeta");
-      if (audioEl && audioEl.dataset.recKey !== recKey) {
+      if (audioEl) {
         audioEl.dataset.recKey = recKey;
-        audioEl.src = recUrl;
+        audioEl.src = `${recUrl}?t=${Date.now()}`;
+        audioEl.load();
       }
       if (dlEl) {
-        dlEl.href = recUrl;
+        dlEl.href = `${recUrl}?t=${Date.now()}`;
         dlEl.download = `asha-vani-${recKey}.wav`;
       }
       if (metaEl) {
@@ -2265,6 +2280,68 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     const lcdSub = document.getElementById("lcdSub");
     const lcdDuplex = document.getElementById("lcdDuplex");
     const lcdTimer = document.getElementById("lcdTimer");
+    const callerSelect = document.getElementById("callerSelect");
+    const handsetLangBadge = document.getElementById("handsetLangBadge");
+
+    let activeCallLanguage = "hi";
+    let activeCallLanguageSource = "DEFAULT";
+
+    function updateLanguageBadges(lang, source) {
+      activeCallLanguage = (lang || "hi").toLowerCase();
+      activeCallLanguageSource = source || "DEFAULT";
+      const shortSrc = activeCallLanguageSource === "REGISTERED" ? "REG" : (activeCallLanguageSource === "AUTO_DETECTED" ? "AUTO" : (activeCallLanguageSource === "SWITCHED" ? "SW" : "DEF"));
+      if (handsetLangBadge) handsetLangBadge.textContent = `${activeCallLanguage.toUpperCase()} · ${shortSrc}`;
+      document.querySelectorAll("#quickLangChips .seg-tab").forEach((btn) => {
+        if (btn.dataset.lang === activeCallLanguage || (activeCallLanguageSource === "DEFAULT" && btn.dataset.lang === "auto")) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+    }
+
+    async function loadWorkerDirectory() {
+      if (location.protocol === "file:" || !callerSelect) return;
+      try {
+        const res = await fetch("/api/workers");
+        if (!res.ok) return;
+        const data = await res.json();
+        const workers = data.workers || [];
+        if (!workers.length) return;
+        callerSelect.innerHTML = "";
+        const unk = document.createElement("option");
+        unk.value = "+919988776655";
+        unk.selected = true;
+        unk.textContent = "🌐 Auto-Detect (Hindi / Tamil / Telugu · Unknown Caller)";
+        callerSelect.appendChild(unk);
+        for (const w of workers) {
+          const opt = document.createElement("option");
+          opt.value = w.sim_caller || "";
+          opt.dataset.workerId = w.asha_id;
+          opt.dataset.lang = (w.language || "hi").toLowerCase();
+          opt.textContent = `${w.full_name} (${w.asha_id} · ${(w.language || "hi").toUpperCase()}) ${w.phone_masked || ""}`;
+          callerSelect.appendChild(opt);
+        }
+      } catch (_) {}
+    }
+    loadWorkerDirectory();
+
+    document.querySelectorAll("#quickLangChips .seg-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#quickLangChips .seg-tab").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const lang = btn.dataset.lang;
+        if (lang === "auto") {
+          callerSelect.value = "+919988776655";
+        } else {
+          const matching = Array.from(callerSelect.options).find((opt) => opt.dataset.lang === lang || opt.textContent.toLowerCase().includes(`· ${lang}`));
+          if (matching) callerSelect.value = matching.value;
+        }
+        if (isCallActive && callSocket && callSocket.readyState === WebSocket.OPEN) {
+          sendUtteranceToBackend(`bhasha badlo ${lang}`);
+        }
+      });
+    });
 
     let callSocket = null;
     let consoleWs = null;
@@ -2292,7 +2369,23 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     let ttsStreamActive = false;
     let ttsFailed = false;
     let pendingGreeting = "";
-    const SILENCE_WAIT_MS = 5000;
+    const SILENCE_WAIT_MS = 1800;
+
+    function updateAudioVu(pct) {
+      const vuEl = document.getElementById("lcdVuText");
+      if (!vuEl) return;
+      if (pct === -1) {
+        vuEl.textContent = "Speaker active";
+        return;
+      }
+      if (pct <= 2) {
+        vuEl.textContent = "VAD: Silence [ · · · · ]";
+        return;
+      }
+      const bars = Math.min(4, Math.ceil(pct / 20));
+      const visual = "▮".repeat(bars) + "·".repeat(4 - bars);
+      vuEl.textContent = `VAD: Speaking [${visual}] ${pct}%`;
+    }
 
     function formatClock(sec) {
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
@@ -2542,15 +2635,23 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
           const sid = row.session_id;
           const ts = row.occurred_at;
           const payload = row.payload || {};
-          if (evType === "call_started") {
-            ensureLiveVisitStarted(sid, ts, payload.caller);
-          } else if (evType === "turn_completed") {
+          if (evType === "turn_completed") {
             applyLiveBackendTurn(sid, payload, ts);
           } else if (evType === "call_ended") {
             const visit = visits.find((v) => v.id === `live-${sid}-1` || v.session_id === sid);
-            if (visit && payload.final_verification === "INCOMPLETE") {
-              visit.verification = "INCOMPLETE";
+            if (visit) {
+              if (visit.patient_name === "Listening for patient..." || (!visit.patient_name && (!visit.turns || visit.turns.length === 0))) {
+                const idx = visits.indexOf(visit);
+                if (idx !== -1) visits.splice(idx, 1);
+              } else if (payload.final_verification === "INCOMPLETE" || visit.verification !== "VERIFIED") {
+                visit.verification = "INCOMPLETE";
+              }
             }
+          }
+        }
+        for (let i = visits.length - 1; i >= 0; i--) {
+          if (visits[i].patient_name === "Listening for patient..." && (!visits[i].turns || visits[i].turns.length === 0)) {
+            visits.splice(i, 1);
           }
         }
         renderRegister();
@@ -2573,6 +2674,20 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
             ensureLiveVisitStarted(event.session_id, event.timestamp, event.payload?.caller);
           } else if (event.event_type === "turn_completed") {
             applyLiveBackendTurn(event.session_id, event.payload, event.timestamp);
+          } else if (event.event_type === "call_ended") {
+            const sid = event.session_id;
+            const visit = visits.find((v) => v.id === `live-${sid}-1` || v.session_id === sid);
+            if (visit) {
+              if (visit.patient_name === "Listening for patient..." || (!visit.patient_name && (!visit.turns || visit.turns.length === 0))) {
+                const vIdx = visits.indexOf(visit);
+                if (vIdx !== -1) visits.splice(vIdx, 1);
+                if (selectedVisitId === visit.id) selectedVisitId = visits[0]?.id || null;
+              } else if (visit.verification !== "VERIFIED") {
+                visit.verification = "INCOMPLETE";
+                visit.clinical_reason = visit.clinical_reason || "Call ended before verification.";
+              }
+              renderRegister();
+            }
           } else if (event.event_type === "dispatch_updated" && event.payload) {
             const target = visits.find((v) => v.id === event.payload.visit_id);
             if (target) {
@@ -2669,7 +2784,11 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       micStream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false },
       });
-      micContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+      try {
+        micContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+      } catch (_) {
+        micContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
       await micContext.resume();
       playbackContext = micContext;
       const source = micContext.createMediaStreamSource(micStream);
@@ -2694,22 +2813,30 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
               })
                 .then(() => {
                   const audioEl = document.getElementById("sheetCallAudio");
-                  if (audioEl && audioEl.dataset.recKey === sid) {
+                  if (audioEl) {
                     audioEl.src = `/api/recordings/${encodeURIComponent(sid)}?t=${Date.now()}`;
+                    audioEl.load();
                   }
                 })
                 .catch(() => {});
             }
           };
-          callMediaRecorder.start(500);
+          callMediaRecorder.start(250);
         }
       } catch (_) {}
-      micProcessor = micContext.createScriptProcessor(1024, 1, 1);
+      micProcessor = micContext.createScriptProcessor(2048, 1, 1);
       micMuteGain = micContext.createGain();
       micMuteGain.gain.value = 0;
       micProcessor.onaudioprocess = (event) => {
-        if (!isCallActive || isHalfDuplexMuted || !callSocket || callSocket.readyState !== WebSocket.OPEN) return;
         const input = event.inputBuffer.getChannelData(0);
+
+        let sumSq = 0;
+        for (let i = 0; i < input.length; i++) sumSq += input[i] * input[i];
+        const rms = Math.sqrt(sumSq / input.length);
+        const levelPct = Math.min(100, Math.round(rms * 400));
+        updateAudioVu(isHalfDuplexMuted ? -1 : levelPct);
+
+        if (!isCallActive || isHalfDuplexMuted || !callSocket || callSocket.readyState !== WebSocket.OPEN) return;
         const ratio = micContext.sampleRate / 8000;
         const outputLength = Math.max(1, Math.floor(input.length / ratio));
         const pcm = new ArrayBuffer(outputLength * 2);
@@ -2730,18 +2857,27 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     }
 
     function stopLiveMicrophone() {
-      if (callMediaRecorder && callMediaRecorder.state !== "inactive") {
-        try { callMediaRecorder.stop(); } catch (_) {}
+      const recorder = callMediaRecorder;
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          if (recorder.state === "recording") recorder.requestData();
+          recorder.stop();
+        } catch (_) {}
       }
       callMediaRecorder = null;
       callMixDest = null;
-      if (micProcessor) micProcessor.disconnect();
-      if (micMuteGain) micMuteGain.disconnect();
-      if (micStream) micStream.getTracks().forEach((track) => track.stop());
-      if (micContext && micContext !== playbackContext) micContext.close().catch(() => {});
+      if (micProcessor) {
+        try { micProcessor.disconnect(); } catch (_) {}
+      }
+      if (micMuteGain) {
+        try { micMuteGain.disconnect(); } catch (_) {}
+      }
+      setTimeout(() => {
+        if (micStream) micStream.getTracks().forEach((track) => track.stop());
+        micStream = null;
+      }, 500);
       micProcessor = null;
       micMuteGain = null;
-      micStream = null;
       micContext = null;
     }
 
@@ -2774,7 +2910,8 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec || recognition) return;
       recognition = new SpeechRec();
-      recognition.lang = "en-IN";
+      const langMap = { hi: "hi-IN", ta: "ta-IN", te: "te-IN" };
+      recognition.lang = langMap[activeCallLanguage] || "hi-IN";
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.onresult = (event) => {
@@ -2789,12 +2926,16 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
         interimSpeech = currentInterim.trim();
         const preview = (accumulatedSpeech + " " + interimSpeech).trim();
         if (preview) lcdSub.textContent = `Mic: "${preview}"`;
-        if (/\b(over|ओवर)\s*[.,!?]*$/i.test(preview)) sendUtteranceToBackend(preview);
-        else if (preview) {
+        if (/\b(over|ओवर)\s*[.,!?]*$/i.test(preview)) {
+          sendUtteranceToBackend(preview);
+        } else if (preview && !interimSpeech) {
+          // VAD pause: Only count silence once interim streaming speech settles
           silenceDebounceTimer = setTimeout(() => {
             const text = (accumulatedSpeech + " " + interimSpeech).trim();
-            if (text && !isHalfDuplexMuted && isCallActive) sendUtteranceToBackend(text);
-          }, SILENCE_WAIT_MS);
+            if (text && !isHalfDuplexMuted && isCallActive && !interimSpeech) {
+              sendUtteranceToBackend(text);
+            }
+          }, 1500);
         }
       };
       recognition.onerror = () => {};
@@ -2870,7 +3011,11 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
 
       if (location.protocol !== "file:") {
         const proto = location.protocol === "https:" ? "wss:" : "ws:";
-        callSocket = new WebSocket(`${proto}//${location.host}/ws/call`);
+        const selectedOpt = callerSelect?.selectedOptions?.[0];
+        const params = new URLSearchParams();
+        if (callerSelect?.value) params.set("caller", callerSelect.value);
+        else if (selectedOpt?.dataset?.workerId) params.set("worker_id", selectedOpt.dataset.workerId);
+        callSocket = new WebSocket(`${proto}//${location.host}/ws/call?${params.toString()}`);
         callSocket.binaryType = "blob";
         callSocket.onmessage = (ev) => {
           if (typeof ev.data !== "string") {
@@ -2881,7 +3026,10 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
           if (msg.type === "call_started") {
             activeSessionId = msg.session_id;
             pendingGreeting = msg.greeting_text || "";
+            updateLanguageBadges(msg.language, msg.language_source);
             ensureLiveVisitStarted(msg.session_id);
+          } else if (msg.type === "language_changed") {
+            updateLanguageBadges(msg.language, msg.language_source);
           } else if (msg.type === "turn_reply") {
             if (msg.turn) {
               applyLiveBackendTurn(msg.session_id || activeSessionId, msg.turn);
@@ -2937,6 +3085,7 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
     }
 
     function endLiveCall() {
+      const prevSid = activeSessionId;
       isCallActive = false;
       isHalfDuplexMuted = false;
       clearTimeout(silenceDebounceTimer);
@@ -2962,8 +3111,38 @@ button:disabled, input:disabled, select:disabled, [aria-disabled="true"] {
       }
       callSocket = null;
       nokiaLcd.classList.remove("in-call");
-      lcdStatus.textContent = "Call ended";
+      lcdStatus.textContent = "Standby · Ready to call";
+      lcdSub.textContent = "Select caller profile & press CALL";
       lcdDuplex.textContent = "Mic idle";
+      lcdTimer.textContent = "00:00";
+      dtmfBuffer = "";
+      updateDtmfDisplay();
+      updateAudioVu(0);
+
+      // Clean up ghost row if no patient data was given
+      if (prevSid) {
+        const audioEl = document.getElementById("sheetCallAudio");
+        const dlEl = document.getElementById("sheetAudioDownload");
+        if (audioEl) {
+          audioEl.src = `/api/recordings/${encodeURIComponent(prevSid)}?t=${Date.now()}`;
+          audioEl.load();
+        }
+        if (dlEl) {
+          dlEl.href = `/api/recordings/${encodeURIComponent(prevSid)}?t=${Date.now()}`;
+          dlEl.download = `asha-vani-${prevSid}.wav`;
+        }
+
+        const vIdx = visits.findIndex(
+          (v) =>
+            (v.id === `live-${prevSid}-1` || v.session_id === prevSid) &&
+            (v.patient_name === "Listening for patient..." || (!v.patient_name && (!v.turns || v.turns.length === 0)))
+        );
+        if (vIdx !== -1) {
+          visits.splice(vIdx, 1);
+          if (selectedVisitId === `live-${prevSid}-1`) selectedVisitId = visits[0]?.id || null;
+          renderRegister();
+        }
+      }
     }
 
     document.getElementById("btnCall").addEventListener("click", startLiveCall);
